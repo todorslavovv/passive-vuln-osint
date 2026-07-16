@@ -1,0 +1,4 @@
+digraph dependencies {
+  rankdir="LR";
+  "npm:jquery@3.5.1" [label="npm\njquery\n3.5.1", style="dashed"];
+}

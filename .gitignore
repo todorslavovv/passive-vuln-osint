@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.coverage.*
+*.coverage
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Reports (generated)
+reports/
+reports_online_nvidia/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.rar
+*.zip
+*.tar.gz
+*.7z
+
+# Environment
+.env
+.env.*

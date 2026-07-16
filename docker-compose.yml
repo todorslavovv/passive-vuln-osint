@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  osintdepintel:
+    build: .
+    image: osintdepintel:latest
+    container_name: osintdepintel
+    volumes:
+      - ./examples:/app/examples:ro
+      - ./reports:/app/reports
+      - ./tests/fixtures:/app/tests/fixtures:ro
+    environment:
+      - OSINTDEPINTEL_LOG_LEVEL=${OSINTDEPINTEL_LOG_LEVEL:-INFO}
+      - OSINTDEPINTEL_LOG_FILE=${OSINTDEPINTEL_LOG_FILE:-/app/reports/osintdepintel.log}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+    command: ["--config", "examples/targets.json", "--all", "--offline", "--output-dir", "reports"]

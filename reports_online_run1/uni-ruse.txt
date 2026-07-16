@@ -1,0 +1,23 @@
+OSINT Dependency Vulnerability Intelligence Report
+Target: uni-ruse (PUBLIC OSINT TARGETS)
+URL: https://www.uni-ruse.bg/
+
+Summary
+- Dependencies: 1
+- Confirmed dependencies: 0
+- Inferred dependencies: 1
+- Vulnerabilities: 0
+- Ranked findings: 0
+- Confidence floor: 0.4
+
+Top Findings
+- No vulnerable dependencies were identified from available passive evidence.
+
+Global Registry Notes
+- assumptions: 34
+- failure_modes: 116
+- confidence_constraints: 127
+- conflicts: 1
+- collection_gaps: 44
+- observations: 18
+- inferences: 125

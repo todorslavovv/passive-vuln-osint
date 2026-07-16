@@ -1,0 +1,6 @@
+digraph dependencies {
+  rankdir="LR";
+  "npm:next@13.4.0" [label="npm\nnext\n13.4.0", style="dashed"];
+  "npm:postcss@8.4.21" [label="npm\npostcss\n8.4.21", style="dashed"];
+  "npm:next@13.4.0" -> "npm:postcss@8.4.21" [style="dashed", label="0.35"];
+}

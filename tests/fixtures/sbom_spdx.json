@@ -1,0 +1,44 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "test-sbom",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-1",
+      "name": "flask",
+      "versionInfo": "2.2.3",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/flask@2.2.3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-2",
+      "name": "gunicorn",
+      "versionInfo": "20.1.0",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/gunicorn@20.1.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-3",
+      "name": "werkzeug",
+      "versionInfo": "2.2.3",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/werkzeug@2.2.3"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "targets": [
+    {
+      "name": "pentest-ground-4280",
+      "url": "https://pentest-ground.com:4280/",
+      "mode": "LAB TARGETS",
+      "package_hints": [
+        {
+          "name": "express",
+          "ecosystem": "npm",
+          "version": "4.17.1",
+          "status": "inferred",
+          "confidence": 0.5,
+          "evidence": "lab target hint for offline repeatability"
+        },
+        {
+          "name": "jquery",
+          "ecosystem": "npm",
+          "version": "3.4.1",
+          "status": "inferred",
+          "confidence": 0.45,
+          "evidence": "common public JS dependency hint"
+        }
+      ]
+    },
+    {
+      "name": "pentest-ground-7001",
+      "url": "https://pentest-ground.com:7001/",
+      "mode": "LAB TARGETS",
+      "package_hints": [
+        {
+          "name": "lodash",
+          "ecosystem": "npm",
+          "version": "4.17.15",
+          "status": "inferred",
+          "confidence": 0.45,
+          "evidence": "lab target hint for offline repeatability"
+        }
+      ]
+    },
+    {
+      "name": "juice-shop",
+      "url": "https://juice-shop.herokuapp.com/",
+      "mode": "LAB TARGETS",
+      "github_repos": [
+        "juice-shop/juice-shop"
+      ],
+      "package_hints": [
+        {
+          "name": "sanitize-html",
+          "ecosystem": "npm",
+          "version": "1.20.0",
+          "status": "confirmed",
+          "confidence": 0.8,
+          "evidence": "well-known open-source lab application dependency hint"
+        }
+      ]
+    },
+    {
+      "name": "otakuflorist",
+      "url": "https://otakuflorist.vercel.app/",
+      "mode": "AUTHORIZED REAL TARGETS",
+      "package_hints": [
+        {
+          "name": "next",
+          "ecosystem": "npm",
+          "version": "13.4.0",
+          "status": "inferred",
+          "confidence": 0.55,
+          "evidence": "Vercel/Next.js deployment hint; verify with stronger provenance in live runs"
+        }
+      ]
+    },
+    {
+      "name": "lipci-design-studio",
+      "url": "https://lipci-design-studio.vercel.app/",
+      "mode": "AUTHORIZED REAL TARGETS",
+      "package_hints": [
+        {
+          "name": "react",
+          "ecosystem": "npm",
+          "version": "18.2.0",
+          "status": "inferred",
+          "confidence": 0.5,
+          "evidence": "frontend framework hint; verify with stronger provenance in live runs"
+        }
+      ]
+    },
+    {
+      "name": "evolution-of-dreams",
+      "url": "https://www.evolutionofdreams.com/en",
+      "mode": "PUBLIC OSINT TARGETS",
+      "package_hints": [
+        {
+          "name": "jquery",
+          "ecosystem": "npm",
+          "version": "3.5.1",
+          "status": "inferred",
+          "confidence": 0.42,
+          "evidence": "public website package hint for offline demo"
+        }
+      ]
+    },
+    {
+      "name": "uni-ruse",
+      "url": "https://www.uni-ruse.bg/",
+      "mode": "PUBLIC OSINT TARGETS",
+      "package_hints": [
+        {
+          "name": "bootstrap",
+          "ecosystem": "npm",
+          "version": "4.3.1",
+          "status": "inferred",
+          "confidence": 0.4,
+          "evidence": "public website package hint for offline demo"
+        }
+      ]
+    }
+  ]
+}

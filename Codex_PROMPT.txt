@@ -1,0 +1,178 @@
+You are building a complete, production-quality Python project in the working directory: C:\DOWNLOADS\Projects\OSINT_Project
+
+Project goal:
+Create a passive OSINT-based Supply Chain Dependency Vulnerability Intelligence System for cybersecurity research and portfolio use. The system must discover software dependencies from public artifacts, normalize findings, build dependency graphs, enrich dependencies with vulnerability data, correlate exploit availability, score risk, and produce both machine-readable and human-readable reports.
+
+Platform requirement:
+- The project will be developed and run on Windows 10 first.
+- The final project must also run on Ubuntu.
+- Keep the codebase cross-platform.
+- Avoid Windows-only assumptions.
+- Prefer standard library and widely available cross-platform packages.
+- If possible, make the project runnable without virtual environments.
+- If dependencies are required, keep them minimal and document them clearly.
+
+Hard constraints:
+- Python CLI application
+- Modular architecture
+- Passive OSINT only: no port scanning, no brute forcing, no active probing, no vulnerability scanning
+- Must work even when GitHub data is absent
+- Must support noisy, incomplete, and conflicting data
+- Must explicitly model confidence/uncertainty for every extracted or inferred dependency
+- Must separate confirmed dependencies from inferred dependencies
+- Must be fully testable and runnable locally
+- Prefer clear, maintainable code over clever code
+
+Target modes:
+Each target must be labeled as one of:
+1. LAB TARGETS
+   - intentionally vulnerable learning environments
+2. AUTHORIZED REAL TARGETS
+   - systems owned by the user or explicitly permitted
+3. PUBLIC OSINT TARGETS
+   - public domains analyzed only through passive sources
+
+Targets for testing:
+LAB TARGETS:
+- https://pentest-ground.com:4280/
+- https://pentest-ground.com:7001/
+- https://juice-shop.herokuapp.com/
+(if one of the LAB TARGETS is down proceed further with the rest)
+
+AUTHORIZED REAL TARGETS:
+- https://otakuflorist.vercel.app/
+- https://lipci-design-studio.vercel.app/
+
+PUBLIC OSINT TARGETS:
+- https://www.evolutionofdreams.com/en
+- https://www.uni-ruse.bg/
+
+Functional requirements:
+1. Target input and orchestration
+   - Implement a target configuration layer that can hold multiple targets and their modes
+   - Process one target at a time
+   - Allow batch processing across all targets
+   - Persist per-target results separately
+   - Keep a global registry/state object for assumptions, risks, failure modes, and confidence constraints
+
+2. Discovery layer
+   - Implement a pluggable discovery architecture
+   - Include passive source plugins for:
+     - GitHub repositories when available
+     - public JavaScript bundles and source maps
+     - public container images
+     - public SBOMs
+     - Wayback Machine archives
+     - mobile app artifact analysis hooks (APK/IPA support as architecture and parser stubs if full extraction is too large)
+     - public package ecosystem metadata
+   - Every plugin must normalize outputs into a common dependency record format
+   - Every record must include provenance, timestamp, source type, and confidence
+
+3. Dependency graph
+   - Build a directed graph of packages and relationships
+   - Include transitive dependencies
+   - Distinguish confirmed vs inferred edges
+   - Support multiple ecosystems:
+     - npm
+     - PyPI
+     - Maven
+     - RubyGems
+     - Go modules
+     - Docker/OCI layer/package inventories
+   - Include conflict handling when sources disagree
+
+4. Vulnerability enrichment
+   - Enrich package/version records using:
+     - OSV.dev
+     - NVD
+     - GitHub Advisory Database
+   - Deduplicate vulnerability records across sources
+   - Support version range handling and package ecosystem matching
+
+5. Exploit intelligence
+   - Cross-reference vulnerable packages/CVEs against:
+     - ExploitDB
+     - Metasploit module references
+     - public PoC repositories
+   - Treat exploit availability as a separate signal, not as proof of exploitability
+
+6. Risk scoring
+   - Define a transparent scoring model using:
+     - severity
+     - exploit availability
+     - exposure confidence
+     - patch lag
+     - provenance quality
+     - inferred vs confirmed status
+   - Make the scoring explainable
+   - Output ranked findings
+
+7. Output
+   - JSON report schema
+   - human-readable CLI report
+   - optional graph export for visualization
+   - per-target summary plus aggregate summary across all targets
+   - include the global registry in the final output
+
+8. Quality and testing
+   - Add unit tests for core parsers, graph building, enrichment, scoring, and registry updates
+   - Add integration tests for at least one target in each target mode
+   - Add sample fixtures/mocks so tests can run without network access
+   - Include clear README instructions for install, run, test, and extend
+   - Use type hints and dataclasses or pydantic where appropriate
+   - Follow a clean package structure
+
+Documentation deliverables:
+Create these two files in the working directory:
+- run_instructions_Windows10.md
+- run_instructions_Ubuntu.md
+
+Each file must contain simple, practical instructions for:
+- installing dependencies
+- running the tool
+- running tests
+- using the sample target configuration
+
+Try to make the project runnable without venvs if possible. If a venv is still strongly recommended, keep it optional and document both paths clearly.
+
+Architecture requirements:
+- Choose the best language, libraries, and storage approach for this project and justify that choice in the codebase docs
+- Implement the project as a clean Python package with a CLI entrypoint
+- Use a plugin architecture so new discovery sources can be added without changing core logic
+- Maintain a global registry object across phases/steps of processing
+- Make the system resilient to missing sources and partial results
+
+Execution approach:
+- Build the project end-to-end, not just a skeleton
+- If you need to make scope tradeoffs, prioritize:
+  1. working CLI
+  2. target ingestion and target modes
+  3. dependency discovery and normalization
+  4. graph building
+  5. vulnerability enrichment
+  6. scoring and reporting
+  7. tests and documentation
+- If something cannot be fully implemented, create a solid stub with the correct interface and clearly document the limitation
+
+Deliverables:
+- Full source code
+- package structure
+- CLI entrypoint
+- tests
+- README
+- sample configuration file for the six targets
+- sample output report
+- run_instructions_Windows10.md
+- run_instructions_Ubuntu.md
+- concise explanation of any assumptions and limitations
+- final verdict on whether the system is complete and what remains unfinished, if anything
+
+Important behavior:
+- Do not select random targets
+- Do not use active scanning
+- Do not mix lab target logic with real/public target logic
+- Do not silently discard conflicts
+- Do not omit confidence scoring
+- Do not omit provenance
+
+Start by creating the project structure, then implement the core pipeline, then add enrichment, scoring, reporting, tests, and the two run instruction files.

@@ -1,0 +1,154 @@
+{
+  "transitives": {
+    "npm:express@4.17.1": [
+      {
+        "name": "qs",
+        "ecosystem": "npm",
+        "version": "6.7.0",
+        "confidence": 0.45
+      }
+    ],
+    "npm:next@13.4.0": [
+      {
+        "name": "postcss",
+        "ecosystem": "npm",
+        "version": "8.4.21",
+        "confidence": 0.35
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "vulnerability_id": "CVE-2019-11358",
+      "source": "fixture/NVD",
+      "package_name": "jquery",
+      "ecosystem": "npm",
+      "affected_versions": [
+        "<3.4.0"
+      ],
+      "summary": "Prototype pollution in jQuery before 3.4.0.",
+      "severity": "MEDIUM",
+      "cvss_score": 6.1,
+      "published": "2019-04-20T00:00:00+00:00",
+      "aliases": [
+        "GHSA-6c3j-c64m-qhgq"
+      ],
+      "references": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2019-11358"
+      ],
+      "match_confidence": 0.88
+    },
+    {
+      "vulnerability_id": "CVE-2020-8203",
+      "source": "fixture/NVD",
+      "package_name": "lodash",
+      "ecosystem": "npm",
+      "affected_versions": [
+        "<4.17.19"
+      ],
+      "summary": "Prototype pollution in lodash.",
+      "severity": "HIGH",
+      "cvss_score": 7.4,
+      "published": "2020-07-15T00:00:00+00:00",
+      "aliases": [
+        "GHSA-p6mc-m468-83gw"
+      ],
+      "references": [
+        "https://github.com/lodash/lodash/wiki/Security"
+      ],
+      "match_confidence": 0.9
+    },
+    {
+      "vulnerability_id": "CVE-2021-23424",
+      "source": "fixture/OSV",
+      "package_name": "sanitize-html",
+      "ecosystem": "npm",
+      "affected_versions": [
+        "<2.5.1"
+      ],
+      "summary": "Improper input sanitization in sanitize-html.",
+      "severity": "HIGH",
+      "cvss_score": 7.5,
+      "published": "2021-08-30T00:00:00+00:00",
+      "aliases": [
+        "GHSA-rm97-x556-q36h"
+      ],
+      "references": [
+        "https://github.com/advisories/GHSA-rm97-x556-q36h"
+      ],
+      "match_confidence": 0.92
+    },
+    {
+      "vulnerability_id": "CVE-2023-46298",
+      "source": "fixture/OSV",
+      "package_name": "next",
+      "ecosystem": "npm",
+      "affected_versions": [
+        "<13.4.20"
+      ],
+      "summary": "Next.js has a request smuggling issue in specific deployment configurations.",
+      "severity": "HIGH",
+      "cvss_score": 7.5,
+      "published": "2023-10-30T00:00:00+00:00",
+      "aliases": [
+        "GHSA-fr5h-rqp8-mj6g"
+      ],
+      "references": [
+        "https://github.com/advisories/GHSA-fr5h-rqp8-mj6g"
+      ],
+      "match_confidence": 0.84
+    },
+    {
+      "vulnerability_id": "CVE-2022-31129",
+      "source": "fixture/OSV",
+      "package_name": "moment",
+      "ecosystem": "npm",
+      "affected_versions": [
+        "<2.29.4"
+      ],
+      "summary": "Path traversal in moment locale handling.",
+      "severity": "HIGH",
+      "cvss_score": 7.5,
+      "published": "2022-07-06T00:00:00+00:00",
+      "aliases": [
+        "GHSA-wc69-rhjr-hc9g"
+      ],
+      "references": [
+        "https://github.com/advisories/GHSA-wc69-rhjr-hc9g"
+      ],
+      "match_confidence": 0.87
+    },
+    {
+      "vulnerability_id": "CVE-2020-11023",
+      "source": "fixture/GHSA",
+      "package_name": "jquery",
+      "ecosystem": "npm",
+      "affected_versions": [
+        ">=1.0.3 <3.5.0"
+      ],
+      "summary": "Cross-site scripting in jQuery htmlPrefilter.",
+      "severity": "MEDIUM",
+      "cvss_score": 6.1,
+      "published": "2020-04-20T00:00:00+00:00",
+      "aliases": [
+        "GHSA-gxr4-xpm5-m4q9"
+      ],
+      "references": [
+        "https://github.com/advisories/GHSA-gxr4-xpm5-m4q9"
+      ],
+      "match_confidence": 0.88
+    }
+  ],
+  "exploits": [
+    {
+      "vulnerability_ids": [
+        "CVE-2020-8203",
+        "GHSA-p6mc-m468-83gw"
+      ],
+      "source": "public PoC repository fixture",
+      "reference": "https://github.com/example/poc-lodash-prototype-pollution",
+      "description": "Fixture representing public PoC availability; not proof of exploitability against the target.",
+      "confidence": 0.55
+    }
+  ]
+}

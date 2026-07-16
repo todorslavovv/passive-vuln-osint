@@ -1,0 +1,4 @@
+digraph dependencies {
+  rankdir="LR";
+  "npm:bootstrap@4.3.1" [label="npm\nbootstrap\n4.3.1", style="dashed"];
+}
