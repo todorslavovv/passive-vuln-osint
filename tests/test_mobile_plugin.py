@@ -17,7 +17,7 @@ from osintdepintel.discovery.plugins import (
     _safe_zip_read,
 )
 from osintdepintel.http import HttpError
-from osintdepintel.models import TargetConfig, TargetMode
+from osintdepintel.models import TargetConfig
 from osintdepintel.registry import GlobalRegistry
 
 
@@ -104,7 +104,6 @@ class MobilePluginTests(unittest.TestCase):
         self.target = TargetConfig(
             "testapp",
             "https://example.test",
-            TargetMode.LAB,
             mobile_artifacts=["https://example.test/app.apk"],
         )
         self.registry = GlobalRegistry()
@@ -112,7 +111,7 @@ class MobilePluginTests(unittest.TestCase):
     # --- discover() edge cases ---
 
     def test_no_mobile_artifacts_returns_empty(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB)
+        target = TargetConfig("test", "https://example.test")
         result = MobileArtifactPlugin(offline=False).discover(target, GlobalRegistry())
         self.assertEqual(len(result.records), 0)
 
@@ -203,7 +202,6 @@ class MobilePluginTests(unittest.TestCase):
         target = TargetConfig(
             "testapp",
             "https://example.test",
-            TargetMode.LAB,
             mobile_artifacts=["https://example.test/app.ipa"],
         )
         mock_http = MagicMock()
@@ -217,7 +215,6 @@ class MobilePluginTests(unittest.TestCase):
         target = TargetConfig(
             "testapp",
             "https://example.test",
-            TargetMode.LAB,
             mobile_artifacts=["https://example.test/app.ipa"],
         )
         mock_http = MagicMock()

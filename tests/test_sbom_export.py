@@ -12,7 +12,7 @@ class SbomExportTests(unittest.TestCase):
     def setUp(self) -> None:
         self.maxDiff = None
         self.report = {
-            "target": {"name": "test-target", "url": "https://example.test", "mode": "LAB TARGETS"},
+            "target": {"name": "test-target", "url": "https://example.test"},
             "dependencies": [
                 {
                     "name": "lodash",

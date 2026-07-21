@@ -5,7 +5,7 @@ from typing import Any
 
 from osintdepintel.discovery.plugins import WaybackMachinePlugin
 from osintdepintel.http import HttpError
-from osintdepintel.models import TargetConfig, TargetMode
+from osintdepintel.models import TargetConfig
 from osintdepintel.registry import GlobalRegistry
 
 
@@ -26,7 +26,7 @@ class FakeHttpClientForWayback:
 
 class WaybackMachinePluginTests(unittest.TestCase):
     def test_offline_skip(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC)
+        target = TargetConfig("test", "https://example.test")
         registry = GlobalRegistry()
         plugin = WaybackMachinePlugin(offline=True)
         result = plugin.discover(target, registry)
@@ -36,7 +36,7 @@ class WaybackMachinePluginTests(unittest.TestCase):
         self.assertTrue(any("offline" in str(g) for g in reg_dict.get("collection_gaps", [])))
 
     def test_no_host_returns_empty(self) -> None:
-        target = TargetConfig("test", "not-a-url", TargetMode.PUBLIC)
+        target = TargetConfig("test", "not-a-url")
         plugin = WaybackMachinePlugin(offline=False)
         result = plugin.discover(target, GlobalRegistry())
         self.assertEqual(len(result.records), 0)
@@ -49,7 +49,7 @@ class WaybackMachinePluginTests(unittest.TestCase):
             def fetch(self, url: str) -> str:
                 raise HttpError("fetch failed")
 
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC)
+        target = TargetConfig("test", "https://example.test")
         plugin = WaybackMachinePlugin(http=FailHttp())  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
         self.assertEqual(len(result.records), 0)
@@ -71,7 +71,7 @@ class WaybackMachinePluginTests(unittest.TestCase):
             def fetch(self, url: str) -> str:
                 return "/*! jquery@3.6.0 */"
 
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC)
+        target = TargetConfig("test", "https://example.test")
         plugin = WaybackMachinePlugin(http=MockHttp())  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
         self.assertGreater(len(result.records), 0)
@@ -100,7 +100,7 @@ class WaybackMachinePluginTests(unittest.TestCase):
             def fetch(self, url: str) -> str:
                 return "var x = 1;"
 
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC)
+        target = TargetConfig("test", "https://example.test")
         plugin = WaybackMachinePlugin(http=MockHttp())  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
         self.assertEqual(len(result.records), 0)
@@ -118,7 +118,7 @@ class WaybackMachinePluginTests(unittest.TestCase):
             def fetch(self, url: str) -> str:
                 raise HttpError("fetch failed")
 
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC)
+        target = TargetConfig("test", "https://example.test")
         plugin = WaybackMachinePlugin(http=MockHttp())  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
         self.assertEqual(len(result.records), 0)
@@ -150,7 +150,7 @@ class WaybackMachinePluginTests(unittest.TestCase):
                 self.call_count += 1
                 return "/*! jquery@3.6.0 */"
 
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC)
+        target = TargetConfig("test", "https://example.test")
         plugin = WaybackMachinePlugin(http=RecordingHttp())  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
         # a.js has 5 entries → capped at 3; b.js has 2 → both fetched → total 5 fetch calls

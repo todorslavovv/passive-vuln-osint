@@ -1,4 +1,0 @@
-digraph dependencies {
-  rankdir="LR";
-  "npm:react@18.2.0" [label="npm\nreact\n18.2.0", style="dashed"];
-}

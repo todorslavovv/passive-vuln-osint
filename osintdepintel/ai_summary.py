@@ -66,7 +66,6 @@ def _summary_prompt(aggregate_report: dict[str, Any]) -> str:
         "targets": [
             {
                 "name": target.get("name"),
-                "mode": target.get("mode"),
                 "summary": target.get("summary"),
                 "top_findings": [
                     {
@@ -108,7 +107,7 @@ def _local_fallback_summary(aggregate_report: dict[str, Any], warning: str | Non
         summary = target.get("summary", {})
         lines.append("")
         lines.append(
-            f"{target.get('name')} ({target.get('mode')}): {summary.get('dependency_count', 0)} dependencies, {summary.get('vulnerability_count', 0)} vulnerabilities."
+            f"{target.get('name')}: {summary.get('dependency_count', 0)} dependencies, {summary.get('vulnerability_count', 0)} vulnerabilities."
         )
         for finding in target.get("top_findings", []):
             dep = finding.get("dependency", {})

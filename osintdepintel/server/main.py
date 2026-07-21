@@ -31,8 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-CONFIG_PATH_GLOBAL = Path("examples/targets.json")
-OUTPUT_DIR_GLOBAL = Path("reports")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+CONFIG_PATH_GLOBAL = PROJECT_ROOT / "examples" / "targets.json"
+OUTPUT_DIR_GLOBAL = PROJECT_ROOT / "reports"
 
 
 class ScanState:
@@ -75,7 +76,6 @@ def parse_url_to_target(url: str) -> dict[str, Any]:
         
         name = ""
         github_repos = []
-        mode = "PUBLIC OSINT TARGETS"
         
         if "github.com" in hostname.lower():
             # GitHub URL format: github.com/user/repo/...
@@ -109,7 +109,6 @@ def parse_url_to_target(url: str) -> dict[str, Any]:
         return {
             "name": name,
             "url": url_val,
-            "mode": mode,
             "github_repos": github_repos,
             "sbom_urls": [],
             "container_images": [],
@@ -393,7 +392,17 @@ else:
 
 def run_server(host: str, port: int, config_path: str) -> None:
     global CONFIG_PATH_GLOBAL
-    CONFIG_PATH_GLOBAL = Path(config_path)
+    p = Path(config_path)
+    if p.is_absolute():
+        CONFIG_PATH_GLOBAL = p
+    else:
+        # Check if the path exists relative to the current working directory first,
+        # otherwise resolve it relative to the PROJECT_ROOT.
+        cwd_p = p.resolve()
+        if cwd_p.exists():
+            CONFIG_PATH_GLOBAL = cwd_p
+        else:
+            CONFIG_PATH_GLOBAL = (PROJECT_ROOT / p).resolve()
 
     import uvicorn
 

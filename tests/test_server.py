@@ -23,7 +23,6 @@ def mock_config_and_output(tmp_path):
                     {
                         "name": "test-target",
                         "url": "https://test.example.com",
-                        "mode": "LAB TARGETS",
                         "github_repos": [],
                         "sbom_urls": [],
                         "container_images": [],
@@ -61,46 +60,46 @@ def test_get_targets(mock_config_and_output):
     assert len(data) == 1
     assert data[0]["name"] == "test-target"
     assert data[0]["url"] == "https://test.example.com"
-    assert data[0]["mode"] == "LAB TARGETS"
 
 
 def test_add_target(mock_config_and_output):
-    payload = {"name": "new-target", "url": "https://new.example.com", "mode": "PUBLIC OSINT TARGETS"}
+    payload = {"url": "https://new.example.com"}
     response = client.post("/api/targets", json=payload)
     assert response.status_code == 200
     assert response.json()["status"] == "success"
 
-    # Verify target was saved to file
+    # Verify target was saved to file with auto-derived name
     response = client.get("/api/targets")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
-    assert any(t["name"] == "new-target" for t in data)
+    assert any(t["name"] == "new" for t in data)
 
 
 def test_add_duplicate_target(mock_config_and_output):
-    payload = {"name": "test-target", "url": "https://different.example.com", "mode": "LAB TARGETS"}
+    # URL that auto-derives the same name as an existing target
+    payload = {"url": "https://test-target.example.com"}
     response = client.post("/api/targets", json=payload)
     assert response.status_code == 400
     assert "already exists" in response.json()["detail"]
 
 
 def test_update_target(mock_config_and_output):
-    payload = {"name": "test-target", "url": "https://updated.example.com", "mode": "AUTHORIZED REAL TARGETS"}
+    payload = {"url": "https://updated.example.com"}
     response = client.put("/api/targets/test-target", json=payload)
     assert response.status_code == 200
     assert response.json()["status"] == "success"
 
-    # Verify it updated in file
+    # Verify it updated in file (name auto-derived from URL)
     response = client.get("/api/targets")
     data = response.json()
     assert len(data) == 1
     assert data[0]["url"] == "https://updated.example.com"
-    assert data[0]["mode"] == "AUTHORIZED REAL TARGETS"
+    assert data[0]["name"] == "updated"
 
 
 def test_update_nonexistent_target(mock_config_and_output):
-    payload = {"name": "nonexistent", "url": "https://none.example.com", "mode": "LAB TARGETS"}
+    payload = {"url": "https://none.example.com"}
     response = client.put("/api/targets/nonexistent", json=payload)
     assert response.status_code == 404
 

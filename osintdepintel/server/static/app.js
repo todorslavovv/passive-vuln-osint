@@ -34,16 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         targetFormCard: document.getElementById('target-form-card'),
         targetFormPlaceholder: document.getElementById('target-form-placeholder'),
         targetForm: document.getElementById('target-form'),
-        formMode: document.getElementById('form-mode'),
-        formOriginalName: document.getElementById('form-original-name'),
         targetFormTitle: document.getElementById('target-form-title'),
-        targetNameInput: document.getElementById('target-name'),
         targetUrlInput: document.getElementById('target-url'),
-        targetModeSelect: document.getElementById('target-mode'),
-        targetGithubText: document.getElementById('target-github'),
-        targetSbomText: document.getElementById('target-sbom'),
-        targetImagesText: document.getElementById('target-images'),
-        targetMobileText: document.getElementById('target-mobile'),
         cancelTargetFormBtn: document.getElementById('cancel-target-form'),
         
         // Scanner
@@ -70,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
         reportDetailsPanel: document.getElementById('report-details-panel'),
         reportDetailsPlaceholder: document.getElementById('report-details-placeholder'),
         reportActiveTitle: document.getElementById('report-active-title'),
-        reportActiveMode: document.getElementById('report-active-mode'),
         reportActiveTime: document.getElementById('report-active-time'),
         viewRawJsonBtn: document.getElementById('view-raw-json-btn'),
         roDepsCount: document.getElementById('ro-deps-count'),
@@ -107,10 +98,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // API Helpers
+    async function extractErrorMessage(res, fallback) {
+        const raw = await res.text();
+        try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed.detail === 'string') return parsed.detail;
+            if (parsed && Array.isArray(parsed.detail)) return parsed.detail.join('; ');
+        } catch (_) {}
+        return raw || fallback;
+    }
+
     const api = {
         async get(url) {
             const res = await fetch(url);
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) throw new Error(await extractErrorMessage(res, `Request failed (${res.status})`));
             return res.json();
         },
         async post(url, data) {
@@ -119,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) throw new Error(await extractErrorMessage(res, `Request failed (${res.status})`));
             return res.json();
         },
         async put(url, data) {
@@ -128,12 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) throw new Error(await extractErrorMessage(res, `Request failed (${res.status})`));
             return res.json();
         },
         async delete(url) {
             const res = await fetch(url, { method: 'DELETE' });
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) throw new Error(await extractErrorMessage(res, `Request failed (${res.status})`));
             return res.json();
         }
     };
@@ -240,7 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p>${escapeHtml(target.url)}</p>
                 </div>
                 <div class="target-item-actions flex-between" style="gap: 8px;">
-                    <span class="badge badge-outline">${escapeHtml(target.mode)}</span>
                     <button class="btn btn-xs btn-secondary edit-target-btn" data-name="${escapeHtml(target.name)}">Edit</button>
                     <button class="btn btn-xs btn-danger delete-target-btn" data-name="${escapeHtml(target.name)}">Delete</button>
                 </div>
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDashboardTargetsTable() {
         elements.dashboardTargetsTable.innerHTML = '';
         if (state.targets.length === 0) {
-            elements.dashboardTargetsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No targets configured. Add targets to scan.</td></tr>';
+            elements.dashboardTargetsTable.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No targets configured. Add targets to scan.</td></tr>';
             return;
         }
 
@@ -294,7 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td><strong>${escapeHtml(target.name)}</strong></td>
-                <td><span class="badge badge-outline">${escapeHtml(target.mode)}</span></td>
                 <td><a href="${escapeHtml(target.url)}" target="_blank" class="text-muted">${escapeHtml(target.url)}</a></td>
                 <td>${statusBadge}</td>
                 <td class="text-right">
@@ -325,23 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function openTargetForm(mode, target = null) {
         elements.targetFormPlaceholder.style.display = 'none';
         elements.targetFormCard.style.display = 'block';
-        elements.formMode.value = mode;
-
-        if (mode === 'new') {
-            elements.targetFormTitle.textContent = 'Add New Target';
-            elements.targetNameInput.disabled = false;
-            elements.targetForm.reset();
-        } else {
-            elements.targetFormTitle.textContent = `Edit Target: ${target.name}`;
-            elements.targetNameInput.value = target.name;
-            elements.targetNameInput.disabled = true;
-            elements.formOriginalName.value = target.name;
+        elements.targetFormTitle.textContent = mode === 'new' ? 'Add New Target' : `Edit Target: ${target.name}`;
+        elements.targetForm.reset();
+        if (mode === 'edit' && target) {
             elements.targetUrlInput.value = target.url;
-            elements.targetModeSelect.value = target.mode;
-            elements.targetGithubText.value = (target.github_repos || []).join('\n');
-            elements.targetSbomText.value = (target.sbom_urls || []).join('\n');
-            elements.targetImagesText.value = (target.container_images || []).join('\n');
-            elements.targetMobileText.value = (target.mobile_artifacts || []).join('\n');
         }
     }
 
@@ -357,31 +343,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     elements.targetForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const mode = elements.formMode.value;
-        const name = elements.targetNameInput.value.trim();
-
-        const payload = {
-            name: name,
-            url: elements.targetUrlInput.value.trim(),
-            mode: elements.targetModeSelect.value,
-            github_repos: elements.targetGithubText.value.split('\n').map(l => l.trim()).filter(l => l),
-            sbom_urls: elements.targetSbomText.value.split('\n').map(l => l.trim()).filter(l => l),
-            container_images: elements.targetImagesText.value.split('\n').map(l => l.trim()).filter(l => l),
-            mobile_artifacts: elements.targetMobileText.value.split('\n').map(l => l.trim()).filter(l => l)
-        };
+        const url = elements.targetUrlInput.value.trim();
+        if (!url) return;
 
         try {
-            if (mode === 'new') {
-                await api.post('/api/targets', payload);
-                addConsoleLine(`Target '${name}' created successfully.`, 'system');
-            } else {
-                await api.put(`/api/targets/${name}`, payload);
-                addConsoleLine(`Target '${name}' updated successfully.`, 'system');
-            }
+            await api.post('/api/targets', { url });
+            addConsoleLine(`Target created from URL: ${url}`, 'system');
             await fetchTargets();
             closeTargetForm();
         } catch (err) {
-            alert(`Error saving target configuration: ${err.message}`);
+            const msg = (err && err.message) || 'Unknown error';
+            const dupMatch = msg.match(/Target '([^']+)' already exists/);
+            if (dupMatch) {
+                const existingName = dupMatch[1];
+                const existing = state.targets.find(t => t.name === existingName);
+                const goEdit = confirm(
+                    `Target '${existingName}' already exists.\n\n` +
+                    (existing ? `URL: ${existing.url}\n\n` : '') +
+                    `Open it for editing instead?`
+                );
+                if (goEdit && existing) {
+                    closeTargetForm();
+                    openTargetForm('edit', existing);
+                    elements.targetsListContainer.querySelectorAll('.target-list-item').forEach(el => el.classList.remove('active'));
+                }
+            } else {
+                alert(`Error saving target: ${msg}`);
+            }
         }
     });
 
@@ -594,7 +582,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Header details
         elements.reportActiveTitle.textContent = `Target: ${report.target.name}`;
-        elements.reportActiveMode.textContent = report.target.mode;
         
         // Get date if present in registry or format date
         const time = report.global_registry?.plugin_events?.[0]?.timestamp || report.target.metadata?.scanned_at || '';

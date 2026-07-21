@@ -16,13 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class PipelineIntegrationTests(unittest.TestCase):
     @pytest.mark.e2e
-    def test_process_one_target_from_each_mode_offline(self):
+    def test_process_three_targets_offline(self):
         targets = load_targets(ROOT / "examples" / "targets.json")
-        selected = [
-            next(target for target in targets if target.mode.value == "LAB TARGETS"),
-            next(target for target in targets if target.mode.value == "AUTHORIZED REAL TARGETS"),
-            next(target for target in targets if target.mode.value == "PUBLIC OSINT TARGETS"),
-        ]
+        selected = targets[:3]
         with tempfile.TemporaryDirectory() as temp_dir:
             result = Pipeline(
                 offline=True, fixture_path=ROOT / "tests" / "fixtures" / "offline_intel.json"

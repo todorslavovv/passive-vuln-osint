@@ -6,7 +6,7 @@ from typing import Any
 
 from osintdepintel.discovery.plugins import ContainerImagePlugin
 from osintdepintel.http import HttpError
-from osintdepintel.models import DependencyStatus, DiscoveryResult, TargetConfig, TargetMode
+from osintdepintel.models import DependencyStatus, DiscoveryResult, TargetConfig
 from osintdepintel.registry import GlobalRegistry
 
 
@@ -321,7 +321,7 @@ class ExtractBaseImageLabelTests(unittest.TestCase):
         result = DiscoveryResult()
         plugin._extract_base_image_label(
             result,
-            TargetConfig("test", "https://example.test", TargetMode.LAB),
+            TargetConfig("test", "https://example.test"),
             "my-image:latest",
             "docker.io",
             "test/image",
@@ -339,7 +339,7 @@ class ExtractBaseImageLabelTests(unittest.TestCase):
         result = DiscoveryResult()
         plugin._extract_base_image_label(
             result,
-            TargetConfig("test", "https://example.test", TargetMode.LAB),
+            TargetConfig("test", "https://example.test"),
             "my-image:latest",
             "docker.io",
             "test/image",
@@ -353,7 +353,7 @@ class ExtractBaseImageLabelTests(unittest.TestCase):
         result = DiscoveryResult()
         plugin._extract_base_image_label(
             result,
-            TargetConfig("test", "https://example.test", TargetMode.LAB),
+            TargetConfig("test", "https://example.test"),
             "my-image:latest",
             "docker.io",
             "test/image",
@@ -369,7 +369,7 @@ class ExtractEnvVersionsTests(unittest.TestCase):
         result = DiscoveryResult()
         plugin._extract_env_versions(
             result,
-            TargetConfig("test", "https://example.test", TargetMode.LAB),
+            TargetConfig("test", "https://example.test"),
             "my-image:latest",
             "docker.io",
             "test/image",
@@ -391,7 +391,7 @@ class ExtractEnvVersionsTests(unittest.TestCase):
         result = DiscoveryResult()
         plugin._extract_env_versions(
             result,
-            TargetConfig("test", "https://example.test", TargetMode.LAB),
+            TargetConfig("test", "https://example.test"),
             "my-image:latest",
             "docker.io",
             "test/image",
@@ -405,7 +405,7 @@ class ExtractEnvVersionsTests(unittest.TestCase):
         result = DiscoveryResult()
         plugin._extract_env_versions(
             result,
-            TargetConfig("test", "https://example.test", TargetMode.LAB),
+            TargetConfig("test", "https://example.test"),
             "my-image:latest",
             "docker.io",
             "test/image",
@@ -505,7 +505,7 @@ class ExtractHistoryPackagesTests(unittest.TestCase):
         result = DiscoveryResult()
         plugin._extract_history_packages(
             result,
-            TargetConfig("test", "https://example.test", TargetMode.LAB),
+            TargetConfig("test", "https://example.test"),
             "my-image:latest",
             "docker.io",
             "test/image",
@@ -526,7 +526,7 @@ class ExtractHistoryPackagesTests(unittest.TestCase):
         result = DiscoveryResult()
         plugin._extract_history_packages(
             result,
-            TargetConfig("test", "https://example.test", TargetMode.LAB),
+            TargetConfig("test", "https://example.test"),
             "my-image:latest",
             "docker.io",
             "test/image",
@@ -538,13 +538,13 @@ class ExtractHistoryPackagesTests(unittest.TestCase):
 
 class DiscoverIntegrationTests(unittest.TestCase):
     def test_no_images_returns_empty(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB)
+        target = TargetConfig("test", "https://example.test")
         registry = GlobalRegistry()
         result = ContainerImagePlugin(offline=False).discover(target, registry)
         self.assertEqual(len(result.records), 0)
 
     def test_offline_mode_returns_empty_with_assumptions(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["nginx:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["nginx:latest"])
         registry = GlobalRegistry()
         result = ContainerImagePlugin(offline=True).discover(target, registry)
         self.assertEqual(len(result.records), 0)
@@ -554,7 +554,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
 
     def test_token_failure_adds_failure_and_gap(self) -> None:
         http = FakeHttp()
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["nginx:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["nginx:latest"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)
@@ -569,7 +569,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
                 }
             }
         )
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["nginx:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["nginx:latest"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)
@@ -602,7 +602,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
                 "https://registry-1.docker.io/v2/library/nginx/blobs/sha256:cfg123": json.dumps(config),
             },
         )
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["nginx:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["nginx:latest"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)
@@ -635,7 +635,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
                 "https://registry-1.docker.io/v2/library/ruby/blobs/sha256:cfg456": json.dumps(config),
             },
         )
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["ruby:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["ruby:latest"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)
@@ -664,7 +664,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
                 "https://registry-1.docker.io/v2/library/test/manifests/latest": json.dumps(index),
             },
         )
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["test:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["test:latest"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)
@@ -687,7 +687,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
                 "https://registry-1.docker.io/v2/library/test/manifests/latest": json.dumps(manifest),
             },
         )
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["test:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["test:latest"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)
@@ -712,7 +712,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
                 "https://registry-1.docker.io/v2/library/test/blobs/sha256:cfg": json.dumps(config),
             },
         )
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["test:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["test:latest"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         plugin.discover(target, registry)
@@ -734,7 +734,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
                 "https://ghcr.io/v2/org/app/blobs/sha256:cfg": json.dumps(config),
             },
         )
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["ghcr.io/org/app:v1.0"])
+        target = TargetConfig("test", "https://example.test", container_images=["ghcr.io/org/app:v1.0"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)
@@ -757,7 +757,7 @@ class DiscoverIntegrationTests(unittest.TestCase):
                 "https://registry-1.docker.io/v2/library/test/manifests/latest": json.dumps(manifest),
             },
         )
-        target = TargetConfig("test", "https://example.test", TargetMode.LAB, container_images=["test:latest"])
+        target = TargetConfig("test", "https://example.test", container_images=["test:latest"])
         registry = GlobalRegistry()
         plugin = ContainerImagePlugin(http=http, offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)

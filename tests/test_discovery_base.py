@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from osintdepintel.discovery.base import DiscoveryPlugin
-from osintdepintel.models import DiscoveryResult, TargetConfig, TargetMode
+from osintdepintel.models import DiscoveryResult, TargetConfig
 from osintdepintel.registry import GlobalRegistry
 
 
@@ -17,7 +17,7 @@ class ConcretePlugin(DiscoveryPlugin):
 class DiscoveryBaseTests(unittest.TestCase):
     def setUp(self) -> None:
         self.plugin = ConcretePlugin()
-        self.target = TargetConfig("test", "https://test/", TargetMode.LAB)
+        self.target = TargetConfig("test", "https://test/")
         self.registry = GlobalRegistry()
 
     def test_plugin_name(self) -> None:

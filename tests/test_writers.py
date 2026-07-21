@@ -18,7 +18,7 @@ class WriterTests(unittest.TestCase):
     def setUp(self) -> None:
         self.sample_report = {
             "schema_version": "1.0",
-            "target": {"name": "test-target", "url": "https://test/", "mode": "LAB TARGETS"},
+            "target": {"name": "test-target", "url": "https://test/"},
             "summary": {
                 "dependency_count": 3,
                 "confirmed_dependencies": 2,

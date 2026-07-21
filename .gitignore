@@ -22,6 +22,7 @@ env/
 # Reports (generated)
 reports/
 reports_online_nvidia/
+reports_online_run1/
 
 # IDE
 .vscode/

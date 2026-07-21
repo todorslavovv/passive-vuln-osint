@@ -4,7 +4,7 @@ import unittest
 
 from osintdepintel.discovery.plugins import GitHubRepositoryPlugin
 from osintdepintel.http import HttpError
-from osintdepintel.models import DependencyStatus, TargetConfig, TargetMode
+from osintdepintel.models import DependencyStatus, TargetConfig
 from osintdepintel.registry import GlobalRegistry
 
 
@@ -20,7 +20,7 @@ class FakeHttp:
 
 class GitHubRepositoryPluginTests(unittest.TestCase):
     def test_no_repos_returns_empty_and_adds_assumption_and_gap(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=[])
+        target = TargetConfig("test", "https://example.test", github_repos=[])
         registry = GlobalRegistry()
         plugin = GitHubRepositoryPlugin(offline=False)
         result = plugin.discover(target, registry)
@@ -31,7 +31,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         self.assertTrue(any("no github repository" in str(g).lower() for g in reg_dict.get("collection_gaps", [])))
 
     def test_offline_skips_and_adds_assumption_and_gap(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["org/repo"])
+        target = TargetConfig("test", "https://example.test", github_repos=["org/repo"])
         registry = GlobalRegistry()
         plugin = GitHubRepositoryPlugin(offline=True)
         result = plugin.discover(target, registry)
@@ -42,7 +42,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         self.assertTrue(any("offline" in str(g).lower() for g in reg_dict.get("collection_gaps", [])))
 
     def test_invalid_repo_url_adds_failure(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["not-valid"])
+        target = TargetConfig("test", "https://example.test", github_repos=["not-valid"])
         plugin = GitHubRepositoryPlugin(http=FakeHttp({}), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 
@@ -54,7 +54,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         responses = {
             main_url: '{"name": "test-pkg", "dependencies": {"react": "^18.2.0", "lodash": "^4.17.21"}}',
         }
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["org/repo"])
+        target = TargetConfig("test", "https://example.test", github_repos=["org/repo"])
         plugin = GitHubRepositoryPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 
@@ -73,7 +73,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         responses = {
             master_url: '{"name": "test-pkg", "dependencies": {"react": "^18.2.0"}}',
         }
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["org/repo"])
+        target = TargetConfig("test", "https://example.test", github_repos=["org/repo"])
         plugin = GitHubRepositoryPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 
@@ -81,7 +81,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         self.assertEqual(result.records[0].name, "react")
 
     def test_skips_http_error_gracefully(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["org/repo"])
+        target = TargetConfig("test", "https://example.test", github_repos=["org/repo"])
         registry = GlobalRegistry()
         plugin = GitHubRepositoryPlugin(http=FakeHttp({}), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, registry)
@@ -95,7 +95,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         responses = {
             main_url: "requests==2.28.0\nflask==2.2.0\n",
         }
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["org/repo"])
+        target = TargetConfig("test", "https://example.test", github_repos=["org/repo"])
         plugin = GitHubRepositoryPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 
@@ -113,7 +113,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
             main_req: "requests==2.28.0\n",
             master_pkg: '{"dependencies": {"should-not-reach": "1.0.0"}}',
         }
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["org/repo"])
+        target = TargetConfig("test", "https://example.test", github_repos=["org/repo"])
         plugin = GitHubRepositoryPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 
@@ -132,7 +132,6 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         target = TargetConfig(
             "test",
             "https://example.test",
-            TargetMode.PUBLIC,
             github_repos=["org/repo1", "org/repo2"],
         )
         plugin = GitHubRepositoryPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
@@ -151,7 +150,6 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         target = TargetConfig(
             "test",
             "https://example.test",
-            TargetMode.PUBLIC,
             github_repos=["https://github.com/org/repo"],
         )
         plugin = GitHubRepositoryPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
@@ -165,7 +163,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         responses = {
             main_url: '{"dependencies": {"react": "^18.2.0"}}',
         }
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["org/repo"])
+        target = TargetConfig("test", "https://example.test", github_repos=["org/repo"])
         registry = GlobalRegistry()
         plugin = GitHubRepositoryPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         plugin.discover(target, registry)
@@ -178,7 +176,7 @@ class GitHubRepositoryPluginTests(unittest.TestCase):
         main_url = "https://raw.githubusercontent.com/org/repo/main/package.json"
         content = '{"dependencies": {"react": "^18.2.0"}}'
         responses = {main_url: content}
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, github_repos=["org/repo"])
+        target = TargetConfig("test", "https://example.test", github_repos=["org/repo"])
         plugin = GitHubRepositoryPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 

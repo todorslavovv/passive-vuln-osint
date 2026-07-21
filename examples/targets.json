@@ -3,7 +3,10 @@
     {
       "name": "pentest-ground-4280",
       "url": "https://pentest-ground.com:4280/",
-      "mode": "LAB TARGETS",
+      "github_repos": [],
+      "sbom_urls": [],
+      "container_images": [],
+      "mobile_artifacts": [],
       "package_hints": [
         {
           "name": "express",
@@ -21,12 +24,16 @@
           "confidence": 0.45,
           "evidence": "common public JS dependency hint"
         }
-      ]
+      ],
+      "metadata": {}
     },
     {
       "name": "pentest-ground-7001",
       "url": "https://pentest-ground.com:7001/",
-      "mode": "LAB TARGETS",
+      "github_repos": [],
+      "sbom_urls": [],
+      "container_images": [],
+      "mobile_artifacts": [],
       "package_hints": [
         {
           "name": "lodash",
@@ -36,15 +43,18 @@
           "confidence": 0.45,
           "evidence": "lab target hint for offline repeatability"
         }
-      ]
+      ],
+      "metadata": {}
     },
     {
       "name": "juice-shop",
       "url": "https://juice-shop.herokuapp.com/",
-      "mode": "LAB TARGETS",
       "github_repos": [
         "juice-shop/juice-shop"
       ],
+      "sbom_urls": [],
+      "container_images": [],
+      "mobile_artifacts": [],
       "package_hints": [
         {
           "name": "sanitize-html",
@@ -54,12 +64,16 @@
           "confidence": 0.8,
           "evidence": "well-known open-source lab application dependency hint"
         }
-      ]
+      ],
+      "metadata": {}
     },
     {
       "name": "otakuflorist",
       "url": "https://otakuflorist.vercel.app/",
-      "mode": "AUTHORIZED REAL TARGETS",
+      "github_repos": [],
+      "sbom_urls": [],
+      "container_images": [],
+      "mobile_artifacts": [],
       "package_hints": [
         {
           "name": "next",
@@ -69,12 +83,16 @@
           "confidence": 0.55,
           "evidence": "Vercel/Next.js deployment hint; verify with stronger provenance in live runs"
         }
-      ]
+      ],
+      "metadata": {}
     },
     {
       "name": "lipci-design-studio",
       "url": "https://lipci-design-studio.vercel.app/",
-      "mode": "AUTHORIZED REAL TARGETS",
+      "github_repos": [],
+      "sbom_urls": [],
+      "container_images": [],
+      "mobile_artifacts": [],
       "package_hints": [
         {
           "name": "react",
@@ -84,12 +102,16 @@
           "confidence": 0.5,
           "evidence": "frontend framework hint; verify with stronger provenance in live runs"
         }
-      ]
+      ],
+      "metadata": {}
     },
     {
       "name": "evolution-of-dreams",
       "url": "https://www.evolutionofdreams.com/en",
-      "mode": "PUBLIC OSINT TARGETS",
+      "github_repos": [],
+      "sbom_urls": [],
+      "container_images": [],
+      "mobile_artifacts": [],
       "package_hints": [
         {
           "name": "jquery",
@@ -99,12 +121,16 @@
           "confidence": 0.42,
           "evidence": "public website package hint for offline demo"
         }
-      ]
+      ],
+      "metadata": {}
     },
     {
       "name": "uni-ruse",
       "url": "https://www.uni-ruse.bg/",
-      "mode": "PUBLIC OSINT TARGETS",
+      "github_repos": [],
+      "sbom_urls": [],
+      "container_images": [],
+      "mobile_artifacts": [],
       "package_hints": [
         {
           "name": "bootstrap",
@@ -114,7 +140,18 @@
           "confidence": 0.4,
           "evidence": "public website package hint for offline demo"
         }
-      ]
+      ],
+      "metadata": {}
+    },
+    {
+      "name": "facebook",
+      "url": "https://www.facebook.com/",
+      "github_repos": [],
+      "sbom_urls": [],
+      "container_images": [],
+      "mobile_artifacts": [],
+      "package_hints": [],
+      "metadata": {}
     }
   ]
 }

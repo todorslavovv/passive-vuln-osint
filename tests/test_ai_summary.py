@@ -24,7 +24,6 @@ SAMPLE_AGGREGATE_NO_EXPLOIT: dict = {
     "targets": [
         {
             "name": "notarget.test",
-            "mode": "LAB TARGETS",
             "summary": {"dependency_count": 3, "vulnerability_count": 1},
             "top_findings": [
                 {
@@ -47,7 +46,6 @@ SAMPLE_AGGREGATE: dict = {
     "targets": [
         {
             "name": "example.com",
-            "mode": "PUBLIC OSINT TARGETS",
             "summary": {"dependency_count": 8, "vulnerability_count": 3},
             "top_findings": [
                 {
@@ -140,7 +138,6 @@ class LocalFallbackSummaryTests:
     def test_includes_target_details(self) -> None:
         result = _local_fallback_summary(SAMPLE_AGGREGATE)
         assert "example.com" in result
-        assert "PUBLIC OSINT TARGETS" in result
 
     def test_includes_finding_and_exploit_signal(self) -> None:
         result = _local_fallback_summary(SAMPLE_AGGREGATE)

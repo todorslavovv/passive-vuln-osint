@@ -2,7 +2,7 @@ import json
 import unittest
 
 from osintdepintel.discovery.plugins import JavaScriptBundlePlugin
-from osintdepintel.models import DependencyStatus, TargetConfig, TargetMode
+from osintdepintel.models import DependencyStatus, TargetConfig
 from osintdepintel.registry import GlobalRegistry
 
 
@@ -29,7 +29,7 @@ class JavaScriptPluginTests(unittest.TestCase):
             js_url: "/*! next@13.4.0 */ /*! react@17.0.2 */\n//# sourceMappingURL=app.js.map",
             map_url: json.dumps(source_map),
         }
-        target = TargetConfig("example", html_url, TargetMode.PUBLIC)
+        target = TargetConfig("example", html_url)
         result = JavaScriptBundlePlugin(http=FakeHttpClient(responses), offline=False).discover(
             target, GlobalRegistry()
         )

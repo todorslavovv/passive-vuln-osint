@@ -13,7 +13,6 @@ from osintdepintel.models import (
     DiscoveryResult,
     Provenance,
     TargetConfig,
-    TargetMode,
     VulnerabilityRecord,
 )
 from osintdepintel.pipeline import (
@@ -35,7 +34,7 @@ def _make_plugin(records: list[DependencyRecord]) -> DiscoveryPlugin:
 
 
 def _make_target(name: str = "test-target") -> TargetConfig:
-    return TargetConfig(name=name, url=f"https://{name}.example.com/", mode=TargetMode.LAB)
+    return TargetConfig(name=name, url=f"https://{name}.example.com/")
 
 
 def _make_record(

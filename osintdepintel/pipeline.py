@@ -59,7 +59,7 @@ class Pipeline:
         output_dir: Path,
         include_graph: bool = True,
     ) -> tuple[dict[str, Any], dict[str, Path]]:
-        registry.add_plugin_event(target.name, "orchestrator", f"processing target in mode {target.mode.value}")
+        registry.add_plugin_event(target.name, "orchestrator", f"processing target {target.name}")
         discovery_records: list[DependencyRecord] = []
         discovery_edges = []
         for plugin in self.plugins:

@@ -10,12 +10,6 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-class TargetMode(str, Enum):
-    LAB = "LAB TARGETS"
-    AUTHORIZED = "AUTHORIZED REAL TARGETS"
-    PUBLIC = "PUBLIC OSINT TARGETS"
-
-
 class DependencyStatus(str, Enum):
     CONFIRMED = "confirmed"
     INFERRED = "inferred"
@@ -40,7 +34,6 @@ class Provenance:
 class TargetConfig:
     name: str
     url: str
-    mode: TargetMode
     github_repos: list[str] = field(default_factory=list)
     sbom_urls: list[str] = field(default_factory=list)
     container_images: list[str] = field(default_factory=list)
@@ -53,7 +46,6 @@ class TargetConfig:
         return cls(
             name=raw["name"],
             url=raw["url"],
-            mode=TargetMode(raw["mode"]),
             github_repos=list(raw.get("github_repos", [])),
             sbom_urls=list(raw.get("sbom_urls", [])),
             container_images=list(raw.get("container_images", [])),
@@ -63,9 +55,7 @@ class TargetConfig:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        data = asdict(self)
-        data["mode"] = self.mode.value
-        return data
+        return asdict(self)
 
 
 @dataclass

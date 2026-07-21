@@ -30,7 +30,7 @@ def human_report(report: dict[str, Any]) -> str:
     summary = report["summary"]
     lines = [
         "OSINT Dependency Vulnerability Intelligence Report",
-        f"Target: {target['name']} ({target['mode']})",
+        f"Target: {target['name']}",
         f"URL: {target['url']}",
         "",
         "Summary",
@@ -127,7 +127,6 @@ def aggregate_report(target_reports: list[dict[str, Any]], registry: dict[str, A
         "targets": [
             {
                 "name": report["target"]["name"],
-                "mode": report["target"]["mode"],
                 "summary": report["summary"],
                 "top_findings": report["findings"][:3],
             }

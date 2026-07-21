@@ -121,7 +121,6 @@
                                 <thead>
                                     <tr>
                                         <th>Target Name</th>
-                                        <th>Target Scope Mode</th>
                                         <th>Target URL</th>
                                         <th>Scan Status</th>
                                         <th class="text-right">Actions</th>
@@ -161,11 +160,8 @@
                             </div>
                             <div class="card-body">
                                 <form id="target-form">
-                                    <input type="hidden" id="form-mode" value="new">
-                                    <input type="hidden" id="form-original-name" value="">
-                                    
                                     <div class="form-group">
-                                        <label for="target-url">Target Website or GitHub URL *</label>
+                                        <label for="target-url">Website or GitHub URL *</label>
                                         <input type="text" id="target-url" required placeholder="e.g. https://example.com or https://github.com/user/repo">
                                     </div>
                                     
@@ -280,7 +276,6 @@
                             <div class="report-details-header">
                                 <div class="report-title-info">
                                     <h2 id="report-active-title">Target: Juice-shop</h2>
-                                    <span class="badge badge-outline" id="report-active-mode">LAB TARGET</span>
                                     <span class="report-timestamp" id="report-active-time">Generated: 2026-07-16 10:00</span>
                                 </div>
                                 <div class="report-sub-actions">

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from osintdepintel.discovery.plugins import SBOMPlugin
 from osintdepintel.http import HttpError
-from osintdepintel.models import DependencyStatus, TargetConfig, TargetMode
+from osintdepintel.models import DependencyStatus, TargetConfig
 from osintdepintel.registry import GlobalRegistry
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -26,7 +26,7 @@ class SBOMPluginTests(unittest.TestCase):
     maxDiff = None
 
     def test_no_sbom_urls_returns_empty_and_adds_assumption_and_gap(self) -> None:
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, sbom_urls=[])
+        target = TargetConfig("test", "https://example.test", sbom_urls=[])
         registry = GlobalRegistry()
         plugin = SBOMPlugin(offline=False)
         result = plugin.discover(target, registry)
@@ -40,7 +40,7 @@ class SBOMPluginTests(unittest.TestCase):
 
     def test_offline_skips_and_adds_assumption_and_gap(self) -> None:
         target = TargetConfig(
-            "test", "https://example.test", TargetMode.PUBLIC, sbom_urls=["https://sbom.test/cyclonedx"]
+            "test", "https://example.test", sbom_urls=["https://sbom.test/cyclonedx"]
         )
         registry = GlobalRegistry()
         plugin = SBOMPlugin(offline=True)
@@ -53,7 +53,7 @@ class SBOMPluginTests(unittest.TestCase):
 
     def test_http_error_adds_failure(self) -> None:
         target = TargetConfig(
-            "test", "https://example.test", TargetMode.PUBLIC, sbom_urls=["https://sbom.test/missing"]
+            "test", "https://example.test", sbom_urls=["https://sbom.test/missing"]
         )
         plugin = SBOMPlugin(http=FakeHttp({}), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
@@ -63,7 +63,7 @@ class SBOMPluginTests(unittest.TestCase):
 
     def test_malformed_json_adds_failure(self) -> None:
         responses = {"https://sbom.test/bad": "not valid json"}
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, sbom_urls=["https://sbom.test/bad"])
+        target = TargetConfig("test", "https://example.test", sbom_urls=["https://sbom.test/bad"])
         plugin = SBOMPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 
@@ -74,7 +74,7 @@ class SBOMPluginTests(unittest.TestCase):
         cyclonedx = (FIXTURE_DIR / "sbom_cyclonedx.json").read_text(encoding="utf-8")
         responses = {"https://sbom.test/cyclonedx": cyclonedx}
         target = TargetConfig(
-            "test", "https://example.test", TargetMode.PUBLIC, sbom_urls=["https://sbom.test/cyclonedx"]
+            "test", "https://example.test", sbom_urls=["https://sbom.test/cyclonedx"]
         )
         plugin = SBOMPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
@@ -95,7 +95,7 @@ class SBOMPluginTests(unittest.TestCase):
     def test_parses_spdx_sbom(self) -> None:
         spdx = (FIXTURE_DIR / "sbom_spdx.json").read_text(encoding="utf-8")
         responses = {"https://sbom.test/spdx": spdx}
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, sbom_urls=["https://sbom.test/spdx"])
+        target = TargetConfig("test", "https://example.test", sbom_urls=["https://sbom.test/spdx"])
         plugin = SBOMPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 
@@ -112,7 +112,7 @@ class SBOMPluginTests(unittest.TestCase):
         cyclonedx = (FIXTURE_DIR / "sbom_cyclonedx.json").read_text(encoding="utf-8")
         responses = {"https://sbom.test/cyclonedx": cyclonedx}
         target = TargetConfig(
-            "test", "https://example.test", TargetMode.PUBLIC, sbom_urls=["https://sbom.test/cyclonedx"]
+            "test", "https://example.test", sbom_urls=["https://sbom.test/cyclonedx"]
         )
         plugin = SBOMPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
@@ -125,7 +125,7 @@ class SBOMPluginTests(unittest.TestCase):
         cyclonedx = (FIXTURE_DIR / "sbom_cyclonedx.json").read_text(encoding="utf-8")
         url = "https://sbom.test/cyclonedx"
         responses = {url: cyclonedx}
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, sbom_urls=[url])
+        target = TargetConfig("test", "https://example.test", sbom_urls=[url])
         plugin = SBOMPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 
@@ -150,7 +150,6 @@ class SBOMPluginTests(unittest.TestCase):
         target = TargetConfig(
             "test",
             "https://example.test",
-            TargetMode.PUBLIC,
             sbom_urls=["https://sbom.test/cdx", "https://sbom.test/spdx"],
         )
         plugin = SBOMPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
@@ -164,7 +163,7 @@ class SBOMPluginTests(unittest.TestCase):
     def test_empty_sbom_no_records_no_failures(self) -> None:
         empty_cdx = json.dumps({"bomFormat": "CycloneDX", "specVersion": "1.4", "version": 1, "components": []})
         responses = {"https://sbom.test/empty": empty_cdx}
-        target = TargetConfig("test", "https://example.test", TargetMode.PUBLIC, sbom_urls=["https://sbom.test/empty"])
+        target = TargetConfig("test", "https://example.test", sbom_urls=["https://sbom.test/empty"])
         plugin = SBOMPlugin(http=FakeHttp(responses), offline=False)  # type: ignore[arg-type]
         result = plugin.discover(target, GlobalRegistry())
 

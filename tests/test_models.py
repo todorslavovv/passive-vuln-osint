@@ -9,7 +9,6 @@ from osintdepintel.models import (
     DiscoveryResult,
     Provenance,
     TargetConfig,
-    TargetMode,
     VulnerabilityRecord,
 )
 
@@ -21,16 +20,16 @@ class ModelsTests(unittest.TestCase):
         self.assertIn("T", p.collected_at)
 
     def test_target_config_from_dict(self) -> None:
-        raw = {"name": "test", "url": "https://test/", "mode": "LAB TARGETS", "github_repos": ["org/repo"]}
+        raw = {"name": "test", "url": "https://test/", "github_repos": ["org/repo"]}
         target = TargetConfig.from_dict(raw)
         self.assertEqual(target.name, "test")
-        self.assertEqual(target.mode, TargetMode.LAB)
         self.assertEqual(target.github_repos, ["org/repo"])
 
     def test_target_config_to_dict(self) -> None:
-        target = TargetConfig("test", "https://test/", TargetMode.PUBLIC)
+        target = TargetConfig("test", "https://test/")
         data = target.to_dict()
-        self.assertEqual(data["mode"], "PUBLIC OSINT TARGETS")
+        self.assertEqual(data["name"], "test")
+        self.assertNotIn("mode", data)
 
     def test_dependency_record_key(self) -> None:
         record = DependencyRecord("t", "lodash", "npm", "4.17.15", DependencyStatus.INFERRED, 0.5, [])
