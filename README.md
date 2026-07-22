@@ -1,30 +1,71 @@
 # OSINT Dependency Vulnerability Intelligence
 
-**Passive OSINT supply-chain dependency vulnerability intelligence CLI.** Discovers software dependencies from public web artifacts (HTML, JS bundles, source maps, manifests), resolves versions with evidence chains, correlates known vulnerabilities (OSV, NVD), scores risk, and outputs JSON/text/DOT reports. Zero third-party dependencies. 90% test coverage. Designed for offensive security recon and defensive posture assessment — no active scanning required.
+**Passive OSINT supply-chain dependency vulnerability intelligence CLI and dashboard.** Discovers software dependencies from public web artifacts (HTML, JS bundles, source maps, manifests), resolves versions with evidence chains, correlates known vulnerabilities (OSV, NVD), scores risk, and outputs JSON/text/DOT/SBOM reports. Zero third-party dependencies. 90% test coverage. Designed for offensive security recon and defensive posture assessment — no active scanning required.
 
 ---
 
-This project is a passive OSINT-based Supply Chain Dependency Vulnerability Intelligence System. It discovers dependency evidence from public artifacts, normalizes that evidence, builds a confidence-aware dependency graph, enriches dependencies with vulnerability data, correlates exploit availability as a separate signal, scores risk, and writes JSON, text, and DOT graph reports.
+This project is a passive OSINT-based Supply Chain Dependency Vulnerability Intelligence System. It discovers dependency evidence from public artifacts, normalizes that evidence, builds a confidence-aware dependency graph, enriches dependencies with vulnerability data, correlates exploit availability as a separate signal, scores risk, and writes JSON, text, DOT graph, and SBOM reports.
 
 ## Design Choices
 
 - **Language:** Python 3.10+ for portability, strong standard-library support, and easy local execution on Windows 10 and Ubuntu.
-- **Dependencies:** no required third-party packages. The CLI, tests, HTTP client, parsing, graph export, and reports use only the Python standard library.
-- **Storage:** JSON files for target configuration, fixtures, and reports. This keeps the portfolio project inspectable and easy to run without database setup.
-- **Architecture:** modular package with discovery plugins, enrichment providers, graph construction, scoring, reporting, and a global registry.
+- **Dependencies:** no required third-party packages for the core CLI and tests. The web dashboard uses `fastapi` and `uvicorn` only when the server is started.
+- **Storage:** JSON files for target configuration, fixtures, and reports. No database setup required.
+- **Architecture:** modular package with discovery plugins, enrichment providers, graph construction, scoring, reporting, a global registry, and a web dashboard.
 - **Passive-only:** the tool performs optional public HTTP GET/POST requests to published artifacts and advisory APIs. It does not port scan, brute force, crawl private endpoints, exploit, or actively probe vulnerabilities.
 
-## Target Modes
+## Web Dashboard
 
-Every target is labeled as one of:
+Start the dashboard from the repository root:
 
-- `LAB TARGETS`
-- `AUTHORIZED REAL TARGETS`
-- `PUBLIC OSINT TARGETS`
+```powershell
+python3 -m osintdepintel --server --host 0.0.0.0 --port 8000
+```
 
-The sample config in `examples/targets.json` includes all seven targets named in the original brief. The brief later says "six targets", but seven concrete targets were listed, so none were removed.
+Then open `http://localhost:8000` in a browser.
 
-## Quick Start
+### Dashboard tabs
+
+- **Dashboard** — overview cards and recent scan activity.
+- **Target Manager** — add, edit, and delete target definitions (URL, GitHub repos, SBOM URLs, package hints, etc.).
+- **Scan Runner** — select a single target via radio button, choose live or offline mode, and optionally generate per-target AI summaries with NVIDIA or Gemini.
+- **Report Explorer** — browse per-target reports, view AI summary flags, download artifacts, and delete reports.
+
+### Per-target AI summaries
+
+The dashboard can generate a separate AI summary for each scanned website:
+
+- **NVIDIA** — choose from `nvidia/nemotron-3-ultra-550b-a55b`, `nvidia/llama-3.1-nemotron-70b-instruct`, and `nvidia/mistralai/mixtral-8x22b-instruct-v0.1`.
+- **Gemini** — choose from `gemini-1.5-flash`, `gemini-1.5-flash-8b`, `gemini-1.5-pro`, and `gemini-2.0-flash`.
+
+API keys can be pasted in the UI or set as environment variables:
+
+```powershell
+$env:NVIDIA_API_KEY="your-key"
+$env:GEMINI_API_KEY="your-key"
+```
+
+If no key is provided, the scanner writes a fallback explanation to the per-target summary file so the report remains complete.
+
+### Report artifacts
+
+For each target, the dashboard and CLI write:
+
+- `reports/<target>.json` — machine-readable report with dependencies, graph, vulnerabilities, findings, and registry state.
+- `reports/<target>.txt` — human-readable report.
+- `reports/<target>.dot` — Graphviz DOT dependency graph.
+- `reports/<target>_cyclonedx.json` — CycloneDX SBOM.
+- `reports/<target>_spdx.json` — SPDX SBOM.
+- `reports/<target>_nvidia_summary.txt` — per-target NVIDIA AI summary.
+- `reports/<target>_gemini_summary.txt` — per-target Gemini AI summary.
+
+It also writes:
+
+- `reports/aggregate_report.json` — aggregate summary across processed targets.
+
+Re-scanning the same target overwrites the previous report files, so the report list stays clean.
+
+## CLI Usage
 
 Run all sample targets offline:
 
@@ -46,17 +87,15 @@ python -m osintdepintel --config examples/targets.json --target juice-shop --out
 
 Live mode may query public target HTML/JS artifacts, configured GitHub raw manifests, configured SBOM URLs, the Wayback Machine CDX API, OSV.dev, and NVD. Missing sources are recorded in the global registry rather than treated as fatal.
 
-## Output
+## Target Modes
 
-For each target, the CLI writes:
+Every target is labeled as one of:
 
-- `reports/<target>.json`: machine-readable report with dependencies, graph, vulnerabilities, findings, and registry state.
-- `reports/<target>.txt`: human-readable report.
-- `reports/<target>.dot`: Graphviz DOT dependency graph.
+- `LAB TARGETS`
+- `AUTHORIZED REAL TARGETS`
+- `PUBLIC OSINT TARGETS`
 
-It also writes:
-
-- `reports/aggregate_report.json`: aggregate summary across processed targets.
+The sample config in `examples/targets.json` includes all seven targets named in the original brief plus an optional public-website probe target.
 
 ## Extending Discovery
 
@@ -83,7 +122,7 @@ Every dependency and edge carries confidence. Conflicts are kept in the global r
 
 ## JS/HTML Evidence Chains
 
-The JavaScript discovery plugin now converts passive web artifacts into structured dependency candidates instead of only recording detected files. It inspects:
+The JavaScript discovery plugin converts passive web artifacts into structured dependency candidates. It inspects:
 
 - HTML script tags and inline scripts
 - inline runtime config dependency blocks such as `window.__APP_CONFIG__.dependencies`
@@ -115,7 +154,7 @@ Exploit availability is never treated as proof that a target is exploitable.
 ## Tests
 
 ```powershell
-python -m unittest discover -s tests
+python -m pytest tests
 ```
 
 Tests use fixtures from `tests/fixtures/offline_intel.json` and do not require network access.
