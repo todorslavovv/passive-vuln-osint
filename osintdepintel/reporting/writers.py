@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -145,9 +144,9 @@ def _aggregate_gap_categories(target_reports: list[dict[str, Any]]) -> dict[str,
 
 
 def _safe_filename(value: str) -> str:
+    # Sanitize only; keep the name stable so re-scanning the same target overwrites the previous report.
     safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in value).strip("_").lower()
-    suffix = hashlib.sha256(value.encode()).hexdigest()[:6]
-    return f"{safe}_{suffix}"
+    return safe or "target"
 
 
 def write_cyclonedx_sbom(output_dir: Path, target_name: str, report: dict[str, Any]) -> Path:

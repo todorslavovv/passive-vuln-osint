@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import queue
 import re
 import threading
@@ -13,9 +14,15 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from ..ai_summary import (
+    write_gemini_summary,
+    write_gemini_target_summary,
+    write_nvidia_summary,
+    write_nvidia_target_summary,
+)
 from ..config import TargetConfig, load_targets
 from ..logger import logger
 from ..pipeline import Pipeline
@@ -42,7 +49,6 @@ class ScanState:
         self.targets: list[str] = []
         self.options: dict[str, Any] = {}
         self.log_queue: queue.Queue[str] = queue.Queue()
-        self.history_logs: list[str] = []
         self.error: str | None = None
         self.lock = threading.Lock()
 
@@ -59,8 +65,6 @@ class QueueLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         msg = self.format(record)
         self.state.log_queue.put(msg)
-        with self.state.lock:
-            self.state.history_logs.append(msg)
 
 
 def parse_url_to_target(url: str) -> dict[str, Any]:
@@ -209,9 +213,15 @@ def list_reports() -> list[dict[str, Any]]:
         for file in OUTPUT_DIR_GLOBAL.glob("*.json"):
             if file.name == "aggregate_report.json":
                 continue
+            # Skip auxiliary SBOM exports; only list actual target intelligence reports.
+            if file.name.endswith(("_spdx.json", "_cyclonedx.json")):
+                continue
             try:
                 with file.open("r", encoding="utf-8") as f:
                     data = json.load(f)
+                # Validate the file is a target report (not a raw SBOM or other artifact).
+                if not isinstance(data, dict) or "target" not in data or "summary" not in data:
+                    continue
                 reports.append(
                     {
                         "target_name": file.stem,
@@ -241,6 +251,24 @@ def get_report_detail(target_name: str) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.delete("/api/reports/{target_name}")
+def delete_report(target_name: str) -> dict[str, str]:
+    """Delete a target report and all of its generated artifacts."""
+    safe_stem = target_name
+    deleted: list[str] = []
+    not_found = True
+    suffixes = [".json", ".txt", ".dot", "_cyclonedx.json", "_spdx.json", "_nvidia_summary.txt", "_gemini_summary.txt"]
+    for suffix in suffixes:
+        path = OUTPUT_DIR_GLOBAL / f"{safe_stem}{suffix}"
+        if path.exists():
+            path.unlink()
+            deleted.append(path.name)
+            not_found = False
+    if not_found:
+        raise HTTPException(status_code=404, detail=f"Report for target '{target_name}' not found")
+    return {"status": "success", "deleted": ", ".join(deleted)}
+
+
 @app.get("/api/reports/aggregate")
 def get_aggregate_report() -> dict[str, Any]:
     report_file = OUTPUT_DIR_GLOBAL / "aggregate_report.json"
@@ -253,15 +281,114 @@ def get_aggregate_report() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/api/reports/nvidia-summary")
-def get_nvidia_summary() -> dict[str, str]:
-    summary_file = OUTPUT_DIR_GLOBAL / "nvidia_human_summary.txt"
+@app.get("/api/reports/nvidia-summary/{target_name}")
+def get_nvidia_summary(target_name: str) -> dict[str, str]:
+    summary_file = OUTPUT_DIR_GLOBAL / f"{target_name}_nvidia_summary.txt"
     if not summary_file.exists():
         raise HTTPException(status_code=404, detail="NVIDIA summary file not found")
     try:
         return {"summary": summary_file.read_text(encoding="utf-8")}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/reports/gemini-summary/{target_name}")
+def get_gemini_summary(target_name: str) -> dict[str, str]:
+    summary_file = OUTPUT_DIR_GLOBAL / f"{target_name}_gemini_summary.txt"
+    if not summary_file.exists():
+        raise HTTPException(status_code=404, detail="Gemini summary file not found")
+    try:
+        return {"summary": summary_file.read_text(encoding="utf-8")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/reports/artifacts/{target_name}")
+def list_report_artifacts(target_name: str) -> list[dict[str, Any]]:
+    """Return the downloadable artifacts available for a target report stem."""
+    if not OUTPUT_DIR_GLOBAL.exists():
+        return []
+    # target_name from the report list is already the on-disk file stem.
+    safe_stem = target_name
+    artifacts: list[dict[str, Any]] = []
+    mapping = [
+        ("report-json", f"{safe_stem}.json", "application/json", "report.json"),
+        ("report-text", f"{safe_stem}.txt", "text/plain", "report.txt"),
+        ("graph-dot", f"{safe_stem}.dot", "text/plain", "graph.dot"),
+        ("cyclonedx", f"{safe_stem}_cyclonedx.json", "application/json", "sbom.cyclonedx.json"),
+        ("spdx", f"{safe_stem}_spdx.json", "application/json", "sbom.spdx.json"),
+    ]
+    for kind, filename, media_type, download_name in mapping:
+        path = OUTPUT_DIR_GLOBAL / filename
+        if path.exists():
+            artifacts.append(
+                {
+                    "kind": kind,
+                    "filename": filename,
+                    "download_name": download_name,
+                    "media_type": media_type,
+                    "size": path.stat().st_size,
+                    "url": f"/api/reports/artifact/{target_name}/{kind}",
+                }
+            )
+    # Per-target AI summaries are exposed as downloads for this report stem.
+    nvidia_file = OUTPUT_DIR_GLOBAL / f"{safe_stem}_nvidia_summary.txt"
+    if nvidia_file.exists():
+        artifacts.append(
+            {
+                "kind": "nvidia-summary",
+                "filename": nvidia_file.name,
+                "download_name": "nvidia-summary.txt",
+                "media_type": "text/plain",
+                "size": nvidia_file.stat().st_size,
+                "url": f"/api/reports/artifact/{target_name}/nvidia-summary",
+            }
+        )
+    gemini_file = OUTPUT_DIR_GLOBAL / f"{safe_stem}_gemini_summary.txt"
+    if gemini_file.exists():
+        artifacts.append(
+            {
+                "kind": "gemini-summary",
+                "filename": gemini_file.name,
+                "download_name": "gemini-summary.txt",
+                "media_type": "text/plain",
+                "size": gemini_file.stat().st_size,
+                "url": f"/api/reports/artifact/{target_name}/gemini-summary",
+            }
+        )
+    return artifacts
+
+
+@app.get("/api/reports/artifact/{target_name}/{kind}")
+def download_report_artifact(target_name: str, kind: str) -> FileResponse:
+    """Serve a single report artifact with a friendly download name."""
+    if not OUTPUT_DIR_GLOBAL.exists():
+        raise HTTPException(status_code=404, detail="Output directory not found")
+
+    # target_name from the report list is already the on-disk file stem.
+    safe_stem = target_name
+    artifact_map = {
+        "report-json": (f"{safe_stem}.json", "application/json", "report.json"),
+        "report-text": (f"{safe_stem}.txt", "text/plain", "report.txt"),
+        "graph-dot": (f"{safe_stem}.dot", "text/plain", "graph.dot"),
+        "cyclonedx": (f"{safe_stem}_cyclonedx.json", "application/json", "sbom.cyclonedx.json"),
+        "spdx": (f"{safe_stem}_spdx.json", "application/json", "sbom.spdx.json"),
+        "nvidia-summary": (f"{safe_stem}_nvidia_summary.txt", "text/plain", "nvidia-summary.txt"),
+        "gemini-summary": (f"{safe_stem}_gemini_summary.txt", "text/plain", "gemini-summary.txt"),
+    }
+    if kind not in artifact_map:
+        raise HTTPException(status_code=400, detail=f"Unknown artifact kind: {kind}")
+
+    filename, media_type, download_name = artifact_map[kind]
+    path = OUTPUT_DIR_GLOBAL / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Artifact '{filename}' not found")
+    return FileResponse(
+        str(path),
+        media_type=media_type,
+        filename=download_name,
+        content_disposition_type="attachment",
+    )
 
 
 @app.get("/api/scans/status")
@@ -291,6 +418,7 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
         offline = options.get("offline", False)
         skip_nvd = options.get("skip_nvd", False)
         nvidia_summary = options.get("nvidia_summary", False)
+        gemini_summary = options.get("gemini_summary", False)
         rate_limit = options.get("rate_limit", 4.0)
         max_enrich_dependencies = options.get("max_enrich_dependencies")
 
@@ -306,19 +434,30 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
 
         result = pipeline.process_targets(selected_targets, output_dir=output_dir, include_graph=True)
 
+        # AI summaries are generated per-target so each website report has its own explanation.
         if nvidia_summary:
-            import os
-
-            api_key = os.environ.get("NVIDIA_API_KEY")
-            if not api_key:
-                logger.warning("NVIDIA summary requested but NVIDIA_API_KEY environment variable is missing")
+            nvidia_api_key = options.get("nvidia_api_key") or os.environ.get("NVIDIA_API_KEY")
+            if not nvidia_api_key:
+                logger.warning("NVIDIA summary requested but no API key was provided")
             else:
-                from ..ai_summary import write_nvidia_summary
-
                 nvidia_model = options.get("nvidia_model", "nvidia/nemotron-3-ultra-550b-a55b")
-                logger.info("Requesting NVIDIA summary using model '%s'...", nvidia_model)
-                write_nvidia_summary(result["aggregate"], output_dir, api_key, nvidia_model)
-                logger.info("NVIDIA summary complete.")
+                for report in result["reports"]:
+                    target_name = report["target"]["name"]
+                    logger.info("Requesting NVIDIA summary for '%s' using model '%s'...", target_name, nvidia_model)
+                    write_nvidia_target_summary(report, output_dir, nvidia_api_key, nvidia_model, target_name)
+                logger.info("NVIDIA summaries complete.")
+
+        if gemini_summary:
+            gemini_api_key = options.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
+            if not gemini_api_key:
+                logger.warning("Gemini summary requested but no API key was provided")
+            else:
+                gemini_model = options.get("gemini_model", "gemini-1.5-flash")
+                for report in result["reports"]:
+                    target_name = report["target"]["name"]
+                    logger.info("Requesting Gemini summary for '%s' using model '%s'...", target_name, gemini_model)
+                    write_gemini_target_summary(report, output_dir, gemini_api_key, gemini_model, target_name)
+                logger.info("Gemini summaries complete.")
 
         logger.info("Web scan run completed successfully.")
 
@@ -349,7 +488,6 @@ def start_scan(payload: dict[str, Any]) -> dict[str, str]:
         scan_state.options = payload.get("options", {})
         scan_state.error = None
         scan_state.log_queue = queue.Queue()
-        scan_state.history_logs = []
 
     threading.Thread(target=run_scan_thread, args=(targets_to_scan, scan_state.options), daemon=True).start()
 
@@ -359,11 +497,9 @@ def start_scan(payload: dict[str, Any]) -> dict[str, str]:
 @app.get("/api/scans/stream-logs")
 def stream_logs() -> StreamingResponse:
     async def log_generator() -> AsyncGenerator[str, None]:
-        # First send any history
-        with scan_state.lock:
-            for log in scan_state.history_logs:
-                yield f"data: {log}\n\n"
-
+        # Stream live logs only. Sending history caused duplicate lines when a log
+        # was added to the queue while the initial history batch was still being
+        # flushed to a freshly connected client.
         loop = asyncio.get_event_loop()
         while True:
             try:

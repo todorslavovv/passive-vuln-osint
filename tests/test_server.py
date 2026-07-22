@@ -154,7 +154,10 @@ def test_get_report_details_and_list(mock_config_and_output):
     _, temp_output_dir = mock_config_and_output
 
     # Write mock report file
-    report_data = {"summary": {"dependency_count": 5, "vulnerability_count": 2, "finding_count": 2}}
+    report_data = {
+        "target": {"name": "test-target"},
+        "summary": {"dependency_count": 5, "vulnerability_count": 2, "finding_count": 2},
+    }
     report_file = temp_output_dir / "test-target.json"
     report_file.write_text(json.dumps(report_data), encoding="utf-8")
 
@@ -198,14 +201,14 @@ def test_get_nonexistent_aggregate_report(mock_config_and_output):
 def test_get_nvidia_summary(mock_config_and_output):
     _, temp_output_dir = mock_config_and_output
 
-    summary_file = temp_output_dir / "nvidia_human_summary.txt"
+    summary_file = temp_output_dir / "test-target_nvidia_summary.txt"
     summary_file.write_text("Mock summary content", encoding="utf-8")
 
-    response = client.get("/api/reports/nvidia-summary")
+    response = client.get("/api/reports/nvidia-summary/test-target")
     assert response.status_code == 200
     assert response.json()["summary"] == "Mock summary content"
 
 
 def test_get_nonexistent_nvidia_summary(mock_config_and_output):
-    response = client.get("/api/reports/nvidia-summary")
+    response = client.get("/api/reports/nvidia-summary/test-target")
     assert response.status_code == 404

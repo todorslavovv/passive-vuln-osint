@@ -194,9 +194,9 @@
                             </div>
                             <div class="card-body">
                                 <div class="form-group">
-                                    <label>Select Targets to Analyze</label>
+                                    <label>Select Target to Analyze</label>
                                     <div class="target-checkboxes-container" id="scanner-targets-container">
-                                        <!-- Dynamic target list checkboxes -->
+                                        <!-- Dynamic target list radio buttons -->
                                     </div>
                                 </div>
 
@@ -220,10 +220,33 @@
                                         <span><strong>NVIDIA NIM Summary</strong> (Generate explanation of findings)</span>
                                     </label>
                                 </div>
-                                
                                 <div class="form-group expandable-group" id="nvidia-options-group" style="display: none;">
                                     <label for="scan-opt-nvidia-model">NVIDIA AI Model</label>
-                                    <input type="text" id="scan-opt-nvidia-model" value="nvidia/nemotron-3-ultra-550b-a55b">
+                                    <select id="scan-opt-nvidia-model" class="gradient-select">
+                                        <option value="nvidia/nemotron-3-ultra-550b-a55b">nemotron-3-ultra-550b-a55b</option>
+                                        <option value="nvidia/llama-3.1-nemotron-70b-instruct">llama-3.1-nemotron-70b-instruct</option>
+                                        <option value="nvidia/mistralai/mixtral-8x22b-instruct-v0.1">mixtral-8x22b-instruct-v0.1</option>
+                                    </select>
+                                    <label for="scan-opt-nvidia-api-key" class="margin-top-sm">NVIDIA API Key</label>
+                                    <input type="password" id="scan-opt-nvidia-api-key" placeholder="Paste NVIDIA API key (or set NVIDIA_API_KEY env var)">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="scan-opt-gemini-summary">
+                                        <span><strong>Gemini Summary</strong> (Generate explanation of findings)</span>
+                                    </label>
+                                </div>
+                                <div class="form-group expandable-group" id="gemini-options-group" style="display: none;">
+                                    <label for="scan-opt-gemini-model">Gemini Model</label>
+                                    <select id="scan-opt-gemini-model" class="gradient-select gemini-gradient">
+                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                        <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B</option>
+                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                    </select>
+                                    <label for="scan-opt-gemini-api-key" class="margin-top-sm">Gemini API Key</label>
+                                    <input type="password" id="scan-opt-gemini-api-key" placeholder="Paste Gemini API key (or set GEMINI_API_KEY env var)">
                                 </div>
 
                                 <div class="form-group">
@@ -277,8 +300,11 @@
                                 <div class="report-title-info">
                                     <h2 id="report-active-title">Target: Juice-shop</h2>
                                     <span class="report-timestamp" id="report-active-time">Generated: 2026-07-16 10:00</span>
+                                    <div class="ai-summary-flags" id="ai-summary-flags">
+                                        <span class="ai-flag ai-flag-none">No AI summary</span>
+                                    </div>
                                 </div>
-                                <div class="report-sub-actions">
+                                <div class="report-sub-actions" id="report-artifacts-container">
                                     <button class="btn btn-sm btn-secondary" id="view-raw-json-btn">Raw JSON</button>
                                 </div>
                             </div>
@@ -288,7 +314,8 @@
                                 <button class="sub-tab-btn active" data-subtab="overview">Overview</button>
                                 <button class="sub-tab-btn" data-subtab="findings">Vulnerabilities & Findings</button>
                                 <button class="sub-tab-btn" data-subtab="graph">Dependency Graph</button>
-                                <button class="sub-tab-btn" id="nvidia-summary-subtab" data-subtab="ai-summary" style="display: none;">AI Summary</button>
+                                <button class="sub-tab-btn" id="gemini-summary-subtab" data-subtab="gemini-summary" style="display: none;">Gemini Summary</button>
+                                <button class="sub-tab-btn" id="nvidia-summary-subtab" data-subtab="ai-summary" style="display: none;">NVIDIA Summary</button>
                             </div>
 
                             <div class="report-sub-content">
@@ -388,10 +415,17 @@
                                     </div>
                                 </div>
 
+                                <!-- SUBTAB: GEMINI SUMMARY -->
+                                <div class="sub-tab-pane" id="subtab-gemini-summary">
+                                    <div class="ai-summary-container" id="ro-gemini-summary-text">
+                                        <!-- Rendered Gemini AI text explanation -->
+                                    </div>
+                                </div>
+
                                 <!-- SUBTAB: AI SUMMARY -->
                                 <div class="sub-tab-pane" id="subtab-ai-summary">
                                     <div class="ai-summary-container" id="ro-ai-summary-text">
-                                        <!-- Rendered AI text explanation -->
+                                        <!-- Rendered NVIDIA AI text explanation -->
                                     </div>
                                 </div>
                             </div>

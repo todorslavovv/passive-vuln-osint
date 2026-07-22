@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         targets: [],
         reports: [],
         activeReport: null,
+        activeReportFilename: null,
         scanRunning: false,
         sseSource: null,
         graphRenderer: null
@@ -45,6 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
         scanOptNvidiaSummary: document.getElementById('scan-opt-nvidia-summary'),
         nvidiaOptionsGroup: document.getElementById('nvidia-options-group'),
         scanOptNvidiaModel: document.getElementById('scan-opt-nvidia-model'),
+        scanOptNvidiaApiKey: document.getElementById('scan-opt-nvidia-api-key'),
+        scanOptGeminiSummary: document.getElementById('scan-opt-gemini-summary'),
+        geminiOptionsGroup: document.getElementById('gemini-options-group'),
+        scanOptGeminiModel: document.getElementById('scan-opt-gemini-model'),
+        scanOptGeminiApiKey: document.getElementById('scan-opt-gemini-api-key'),
         scanOptRateLimit: document.getElementById('scan-opt-rate-limit'),
         rateLimitVal: document.getElementById('rate-limit-val'),
         scanOptMaxDeps: document.getElementById('scan-opt-max-deps'),
@@ -63,7 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
         reportDetailsPlaceholder: document.getElementById('report-details-placeholder'),
         reportActiveTitle: document.getElementById('report-active-title'),
         reportActiveTime: document.getElementById('report-active-time'),
+        aiSummaryFlags: document.getElementById('ai-summary-flags'),
         viewRawJsonBtn: document.getElementById('view-raw-json-btn'),
+        reportArtifactsContainer: document.getElementById('report-artifacts-container'),
         roDepsCount: document.getElementById('ro-deps-count'),
         roDepsConfirmedInferred: document.getElementById('ro-deps-confirmed-inferred'),
         roVulnsCount: document.getElementById('ro-vulns-count'),
@@ -82,6 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Subtabs
         subTabBtns: document.querySelectorAll('.sub-tab-btn'),
         subTabPanes: document.querySelectorAll('.sub-tab-pane'),
+        geminiSummarySubtab: document.getElementById('gemini-summary-subtab'),
+        roGeminiSummaryText: document.getElementById('ro-gemini-summary-text'),
         nvidiaSummarySubtab: document.getElementById('nvidia-summary-subtab'),
         roAiSummaryText: document.getElementById('ro-ai-summary-text'),
         graphResetBtn: document.getElementById('graph-reset-btn'),
@@ -305,8 +315,8 @@ document.addEventListener('DOMContentLoaded', () => {
             row.querySelector('.run-single-scan-btn').addEventListener('click', () => {
                 switchTab('scanner');
                 // Select only this target
-                document.querySelectorAll('.scanner-target-checkbox').forEach(cb => {
-                    cb.checked = (cb.value === target.name);
+                document.querySelectorAll('.scanner-target-radio').forEach(rb => {
+                    rb.checked = (rb.value === target.name);
                 });
             });
 
@@ -387,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const label = document.createElement('label');
             label.className = 'checkbox-label';
             label.innerHTML = `
-                <input type="checkbox" class="scanner-target-checkbox" value="${escapeHtml(target.name)}">
+                <input type="radio" name="scanner-target" class="scanner-target-radio" value="${escapeHtml(target.name)}">
                 <span><strong>${escapeHtml(target.name)}</strong> (${escapeHtml(target.url)})</span>
             `;
             elements.scannerTargetsContainer.appendChild(label);
@@ -398,6 +408,10 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.nvidiaOptionsGroup.style.display = elements.scanOptNvidiaSummary.checked ? 'block' : 'none';
     });
 
+    elements.scanOptGeminiSummary.addEventListener('change', () => {
+        elements.geminiOptionsGroup.style.display = elements.scanOptGeminiSummary.checked ? 'block' : 'none';
+    });
+
     elements.scanOptRateLimit.addEventListener('input', () => {
         elements.rateLimitVal.textContent = parseFloat(elements.scanOptRateLimit.value).toFixed(1);
     });
@@ -405,11 +419,11 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.startScanBtn.addEventListener('click', async () => {
         if (state.scanRunning) return;
 
-        const checkedBoxes = document.querySelectorAll('.scanner-target-checkbox:checked');
-        const selectedTargets = Array.from(checkedBoxes).map(cb => cb.value);
+        const selectedRadio = document.querySelector('.scanner-target-radio:checked');
+        const selectedTargets = selectedRadio ? [selectedRadio.value] : [];
 
         if (selectedTargets.length === 0) {
-            alert('Please select at least one target to scan.');
+            alert('Please select a target to scan.');
             return;
         }
 
@@ -418,6 +432,10 @@ document.addEventListener('DOMContentLoaded', () => {
             skip_nvd: elements.scanOptSkipNvd.checked,
             nvidia_summary: elements.scanOptNvidiaSummary.checked,
             nvidia_model: elements.scanOptNvidiaModel.value,
+            nvidia_api_key: elements.scanOptNvidiaApiKey.value.trim() || null,
+            gemini_summary: elements.scanOptGeminiSummary.checked,
+            gemini_model: elements.scanOptGeminiModel.value,
+            gemini_api_key: elements.scanOptGeminiApiKey.value.trim() || null,
             rate_limit: parseFloat(elements.scanOptRateLimit.value),
             max_enrich_dependencies: elements.scanOptMaxDeps.value ? parseInt(elements.scanOptMaxDeps.value) : null
         };
@@ -529,9 +547,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filteredReports.forEach(report => {
             const card = document.createElement('div');
-            card.className = `report-list-card ${state.activeReport && state.activeReport.target.name === report.target_name ? 'active' : ''}`;
+            const isActive = state.activeReportFilename === report.target_name;
+            card.className = `report-list-card ${isActive ? 'active' : ''}`;
             card.innerHTML = `
-                <h4>${escapeHtml(report.target_name)}</h4>
+                <div class="report-card-header">
+                    <h4>${escapeHtml(report.target_name)}</h4>
+                    <button class="btn btn-xs btn-danger delete-report-btn" data-name="${escapeHtml(report.target_name)}" title="Delete report">×</button>
+                </div>
                 <div class="report-card-metrics">
                     <span class="metric-badge">${report.dependency_count} deps</span>
                     <span class="metric-badge" style="color: ${report.finding_count > 0 ? 'var(--color-critical)' : 'inherit'}">${report.finding_count} findings</span>
@@ -545,6 +567,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadReport(report.target_name);
             });
 
+            card.querySelector('.delete-report-btn').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (!confirm(`Delete report '${report.target_name}' and all its artifacts?`)) return;
+                try {
+                    await api.delete(`/api/reports/${report.target_name}`);
+                    if (state.activeReportFilename === report.target_name) {
+                        state.activeReport = null;
+                        state.activeReportFilename = null;
+                        elements.reportDetailsPanel.style.display = 'none';
+                        elements.reportDetailsPlaceholder.style.display = 'flex';
+                    }
+                    await fetchReports();
+                    addConsoleLine(`Report '${report.target_name}' deleted.`, 'system');
+                } catch (err) {
+                    alert(`Failed to delete report: ${err.message}`);
+                }
+            });
+
             elements.reportsListContainer.appendChild(card);
         });
     }
@@ -555,16 +595,34 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoadingState();
         try {
             state.activeReport = await api.get(`/api/reports/detail/${targetName}`);
+            state.activeReportFilename = targetName;
             renderActiveReport();
-            
-            // Try to load NVIDIA summary if requested/present
+
+            // Reset AI summary subtabs
+            elements.roAiSummaryText.innerHTML = '';
+            elements.nvidiaSummarySubtab.style.display = 'none';
+            elements.roGeminiSummaryText.innerHTML = '';
+            elements.geminiSummarySubtab.style.display = 'none';
+
+            // Try to load per-target NVIDIA summary if present
             try {
-                const summaryData = await api.get('/api/reports/nvidia-summary');
-                elements.roAiSummaryText.innerHTML = formatMarkdown(summaryData.summary);
+                const nvidiaData = await api.get(`/api/reports/nvidia-summary/${targetName}`);
+                elements.roAiSummaryText.innerHTML = formatMarkdown(nvidiaData.summary);
                 elements.nvidiaSummarySubtab.style.display = 'block';
             } catch {
-                elements.nvidiaSummarySubtab.style.display = 'none';
+                // No NVIDIA summary available
             }
+
+            // Try to load per-target Gemini summary if present
+            try {
+                const geminiData = await api.get(`/api/reports/gemini-summary/${targetName}`);
+                elements.roGeminiSummaryText.innerHTML = formatMarkdown(geminiData.summary);
+                elements.geminiSummarySubtab.style.display = 'block';
+            } catch {
+                // No Gemini summary available
+            }
+
+            renderAiSummaryFlags();
 
         } catch (err) {
             alert(`Failed to load report: ${err.message}`);
@@ -573,37 +631,120 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function renderAiSummaryFlags() {
+        const hasNvidia = elements.nvidiaSummarySubtab.style.display !== 'none';
+        const hasGemini = elements.geminiSummarySubtab.style.display !== 'none';
+        elements.aiSummaryFlags.innerHTML = '';
+
+        if (hasGemini) {
+            const geminiFlag = document.createElement('span');
+            geminiFlag.className = 'ai-flag ai-flag-blue';
+            geminiFlag.textContent = 'Gemini Summary';
+            elements.aiSummaryFlags.appendChild(geminiFlag);
+        }
+
+        if (hasNvidia) {
+            const nvidiaFlag = document.createElement('span');
+            nvidiaFlag.className = 'ai-flag ai-flag-green';
+            nvidiaFlag.textContent = 'NVIDIA Summary';
+            elements.aiSummaryFlags.appendChild(nvidiaFlag);
+        }
+
+        if (!hasGemini && !hasNvidia) {
+            const noneFlag = document.createElement('span');
+            noneFlag.className = 'ai-flag ai-flag-none';
+            noneFlag.textContent = 'No AI summary';
+            elements.aiSummaryFlags.appendChild(noneFlag);
+        }
+    }
+
+    async function loadReportArtifacts(targetName) {
+        if (!targetName) return;
+        try {
+            const artifacts = await api.get(`/api/reports/artifacts/${targetName}`);
+            elements.reportArtifactsContainer.innerHTML = '';
+
+            // Raw JSON always comes from the in-memory active report
+            const rawJsonBtn = document.createElement('button');
+            rawJsonBtn.className = 'btn btn-sm btn-secondary';
+            rawJsonBtn.textContent = 'Raw JSON';
+            rawJsonBtn.addEventListener('click', () => {
+                if (!state.activeReport) return;
+                elements.jsonRawContent.textContent = JSON.stringify(state.activeReport, null, 2);
+                elements.jsonModal.style.display = 'flex';
+            });
+            elements.reportArtifactsContainer.appendChild(rawJsonBtn);
+
+            artifacts.forEach(artifact => {
+                const btn = document.createElement('a');
+                btn.className = 'btn btn-sm btn-secondary';
+                btn.href = artifact.url;
+                btn.download = artifact.download_name;
+                btn.textContent = _artifactLabel(artifact.kind);
+                elements.reportArtifactsContainer.appendChild(btn);
+            });
+        } catch (err) {
+            console.error('Failed to load report artifacts:', err);
+        }
+    }
+
+    function _artifactLabel(kind) {
+        const labels = {
+            'report-json': 'JSON Report',
+            'report-text': 'Text Report',
+            'graph-dot': 'Graph DOT',
+            'cyclonedx': 'CycloneDX SBOM',
+            'spdx': 'SPDX SBOM',
+            'nvidia-summary': 'NVIDIA Summary',
+            'gemini-summary': 'Gemini Summary'
+        };
+        return labels[kind] || kind;
+    }
+
     function renderActiveReport() {
         const report = state.activeReport;
         if (!report) return;
+
+        // Validate the loaded document is an OSINT target report, not an SBOM or other artifact.
+        if (!report.target || !report.summary) {
+            elements.reportDetailsPlaceholder.style.display = 'none';
+            elements.reportDetailsPanel.style.display = 'flex';
+            elements.reportActiveTitle.textContent = 'Invalid Report';
+            elements.reportActiveTime.textContent = 'The selected file is not a target intelligence report.';
+            elements.reportArtifactsContainer.innerHTML = '';
+            return;
+        }
 
         elements.reportDetailsPlaceholder.style.display = 'none';
         elements.reportDetailsPanel.style.display = 'flex';
 
         // Header details
-        elements.reportActiveTitle.textContent = `Target: ${report.target.name}`;
-        
+        elements.reportActiveTitle.textContent = `Target: ${report.target.name || 'unknown'}`;
+
         // Get date if present in registry or format date
         const time = report.global_registry?.plugin_events?.[0]?.timestamp || report.target.metadata?.scanned_at || '';
         elements.reportActiveTime.textContent = time ? `Scanned: ${time.replace('T', ' ').split('.')[0]}` : 'Offline Run';
 
         // Overview metrics
-        elements.roDepsCount.textContent = report.summary.dependency_count;
-        elements.roDepsConfirmedInferred.textContent = `${report.summary.confirmed_dependencies} confirmed, ${report.summary.inferred_dependencies} inferred`;
-        elements.roVulnsCount.textContent = report.summary.vulnerability_count;
-        elements.roVulnsFindingCount.textContent = `Linked to ${report.summary.finding_count} ranked findings`;
-        elements.roConfidenceFloor.textContent = report.summary.confidence_floor !== null ? report.summary.confidence_floor.toFixed(2) : '1.0';
+        const summary = report.summary || {};
+        elements.roDepsCount.textContent = summary.dependency_count ?? 0;
+        elements.roDepsConfirmedInferred.textContent = `${summary.confirmed_dependencies ?? 0} confirmed, ${summary.inferred_dependencies ?? 0} inferred`;
+        elements.roVulnsCount.textContent = summary.vulnerability_count ?? 0;
+        elements.roVulnsFindingCount.textContent = `Linked to ${summary.finding_count ?? 0} ranked findings`;
+        elements.roConfidenceFloor.textContent = summary.confidence_floor !== null && summary.confidence_floor !== undefined
+            ? summary.confidence_floor.toFixed(2)
+            : '1.0';
 
         // Sources coverage
         elements.roSourcesContainer.innerHTML = '';
-        const observedSources = report.source_coverage.observed_source_types || [];
+        const observedSources = report.source_coverage?.observed_source_types || [];
         if (observedSources.length === 0) {
             elements.roSourcesContainer.innerHTML = '<span class="text-muted">No sources recorded</span>';
         } else {
             observedSources.forEach(src => {
                 const tag = document.createElement('span');
                 tag.className = 'data-tag';
-                tag.textContent = src.toUpperCase();
+                tag.textContent = String(src).toUpperCase();
                 elements.roSourcesContainer.appendChild(tag);
             });
         }
@@ -611,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Confidence distribution progress bars
         elements.roConfidenceDistribution.innerHTML = '';
         const dist = report.confidence_distribution || {};
-        const total = report.summary.dependency_count || 1;
+        const total = summary.dependency_count || 1;
 
         const makeProgressItem = (label, count, colorClass) => {
             const percentage = ((count / total) * 100).toFixed(0);
@@ -653,7 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             conflicts.forEach(conflict => {
                 const div = document.createElement('div');
                 div.className = 'conflict-item';
-                
+
                 let desc = '';
                 if (conflict.conflict_type === 'dependency_version_claim') {
                     desc = `Version claim conflict resolved on package <strong>${escapeHtml(conflict.package)}</strong>. Winner version: <strong>${escapeHtml(conflict.winner.split('@')[1])}</strong> (${conflict.why_winner}).`;
@@ -670,6 +811,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Render dependency graph
         renderGraphTab();
+
+        // Load available report artifacts
+        loadReportArtifacts(report.target.name || state.activeReportFilename);
     }
 
     // ==========================================================================
@@ -685,12 +829,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const severityFilter = elements.findingsSeverityFilter.value;
 
         const filtered = findings.filter(finding => {
-            const packageKey = finding.dependency_key.toLowerCase();
-            const vulnId = finding.vulnerability.vulnerability_id.toLowerCase();
+            const vuln = finding.vulnerability || {};
+            const packageKey = String(finding.dependency_key || '').toLowerCase();
+            const vulnId = String(vuln.vulnerability_id || '').toLowerCase();
             const matchesSearch = packageKey.includes(searchText) || vulnId.includes(searchText);
-            
-            const matchesSeverity = !severityFilter || finding.vulnerability.severity === severityFilter;
-            
+
+            const matchesSeverity = !severityFilter || vuln.severity === severityFilter;
+
             return matchesSearch && matchesSeverity;
         });
 
@@ -702,36 +847,41 @@ document.addEventListener('DOMContentLoaded', () => {
         filtered.forEach((finding, idx) => {
             const card = document.createElement('div');
             card.className = 'finding-card';
-            
+
+            const vuln = finding.vulnerability || {};
+            const dep = finding.dependency || {};
+            const factors = finding.factors || {};
             const hasExploit = (finding.exploit_signals || []).length > 0;
             const exploitBadge = hasExploit ? '<span class="badge badge-sev CRITICAL" style="margin-left: 8px;">Exploit Available</span>' : '';
+            const cvss = vuln.cvss_score;
+            const confidence = typeof factors.confidence === 'number' ? factors.confidence : (dep.confidence || 0);
 
             card.innerHTML = `
                 <div class="finding-card-summary" id="finding-summary-${idx}">
                     <div class="finding-title-block">
                         <span class="finding-package-key">${escapeHtml(finding.dependency_key)}</span>
-                        <span class="finding-vuln-id">${escapeHtml(finding.vulnerability.vulnerability_id)}</span>
+                        <span class="finding-vuln-id">${escapeHtml(vuln.vulnerability_id)}</span>
                     </div>
                     <div class="flex-between" style="gap: 16px;">
                         ${exploitBadge}
-                        <span class="finding-cvss-score text-muted">CVSS: ${finding.vulnerability.cvss_score !== null ? finding.vulnerability.cvss_score.toFixed(1) : 'N/A'}</span>
-                        <span class="badge badge-sev ${finding.vulnerability.severity}">${finding.vulnerability.severity}</span>
+                        <span class="finding-cvss-score text-muted">CVSS: ${cvss !== null && cvss !== undefined ? cvss.toFixed(1) : 'N/A'}</span>
+                        <span class="badge badge-sev ${vuln.severity || 'UNKNOWN'}">${vuln.severity || 'UNKNOWN'}</span>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="arrow-icon"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </div>
                 </div>
                 <div class="finding-card-details" id="finding-details-${idx}">
                     <div class="finding-detail-row">
                         <strong>Description:</strong>
-                        <p>${escapeHtml(finding.vulnerability.summary)}</p>
+                        <p>${escapeHtml(vuln.summary)}</p>
                     </div>
                     <div class="grid-2-col">
                         <div class="finding-detail-row">
                             <strong>Risk Rank Scoring:</strong>
-                            <p>${finding.score.toFixed(1)} / 100 (${escapeHtml(finding.rank_reason)})</p>
+                            <p>${typeof finding.score === 'number' ? finding.score.toFixed(1) : 'N/A'} / 100 (${escapeHtml(finding.rank_reason)})</p>
                         </div>
                         <div class="finding-detail-row">
                             <strong>Exposure Confidence:</strong>
-                            <p>${(finding.factors.confidence * 100).toFixed(0)}% (${finding.dependency.status})</p>
+                            <p>${(confidence * 100).toFixed(0)}% (${dep.status || 'unknown'})</p>
                         </div>
                     </div>
                     ${hasExploit ? `
@@ -748,11 +898,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
                     ` : ''}
-                    ${(finding.vulnerability.references || []).length > 0 ? `
+                    ${(vuln.references || []).length > 0 ? `
                         <div class="finding-detail-row">
                             <strong>References:</strong>
                             <ul style="padding-left: 20px; font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
-                                ${finding.vulnerability.references.slice(0, 5).map(ref => `
+                                ${vuln.references.slice(0, 5).map(ref => `
                                     <li><a href="${escapeHtml(ref)}" target="_blank" style="color: var(--accent-blue);">${escapeHtml(ref)}</a></li>
                                 `).join('')}
                             </ul>
@@ -784,6 +934,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     function renderGraphTab() {
         if (!state.activeReport) return;
+        const graph = state.activeReport.graph || {};
+        const nodes = graph.nodes || [];
+        const edges = graph.edges || [];
+        if (!nodes.length && !edges.length) return;
 
         if (!state.graphRenderer) {
             state.graphRenderer = new window.DependencyGraphRenderer('dependency-graph-canvas', (nodeData) => {
@@ -791,9 +945,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const nodes = state.activeReport.graph.nodes;
-        const edges = state.activeReport.graph.edges;
-        
         state.graphRenderer.setData(nodes, edges);
     }
 
@@ -823,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <p><strong>Locator Path:</strong> <span style="word-break: break-all; color: var(--text-secondary);">${escapeHtml(prov.locator)}</span></p>
                             <p><strong>Evidence:</strong> ${escapeHtml(prov.evidence || 'No details provided.')}</p>
                             ${prov.snippet ? `<span class="evidence-snippet">${escapeHtml(prov.snippet)}</span>` : ''}
-                            <span class="report-card-date">Collected: ${escapeHtml(prov.collected_at.replace('T', ' ').split('.')[0])}</span>
+                            <span class="report-card-date">Collected: ${prov.collected_at ? escapeHtml(prov.collected_at.replace('T', ' ').split('.')[0]) : 'unknown'}</span>
                         </div>
                     `).join('')}
                 </div>
@@ -839,12 +990,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     // RAW JSON MODAL
     // ==========================================================================
-    elements.viewRawJsonBtn.addEventListener('click', () => {
-        if (!state.activeReport) return;
-        elements.jsonRawContent.textContent = JSON.stringify(state.activeReport, null, 2);
-        elements.jsonModal.style.display = 'flex';
-    });
-
     elements.closeJsonModalBtn.addEventListener('click', () => {
         elements.jsonModal.style.display = 'none';
     });
