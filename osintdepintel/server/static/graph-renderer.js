@@ -1,6 +1,6 @@
 /**
- * DependencyGraphRenderer - Lightweight Force-Directed Graph Layout on HTML5 Canvas
- * Handles Pan, Zoom, Node Dragging, Custom Styling, and High-DPI rendering.
+ * DependencyGraphRenderer — force-directed canvas graph.
+ * Defers layout until the canvas has a real size (hidden tab safe).
  */
 class DependencyGraphRenderer {
     constructor(canvasId, onNodeSelected) {
@@ -9,81 +9,115 @@ class DependencyGraphRenderer {
         this.ctx = this.canvas.getContext('2d');
         this.onNodeSelected = onNodeSelected;
 
-        // Graph Data
         this.nodes = [];
         this.edges = [];
         this.nodesMap = new Map();
+        this.pending = null; // {nodesData, edgesData} until first real size
 
-        // Viewport State (Pan & Zoom)
-        this.zoom = 1.0;
+        this.zoom = 1;
         this.panX = 0;
         this.panY = 0;
 
-        // Interaction State
         this.draggedNode = null;
         this.selectedNode = null;
         this.isPanning = false;
         this.lastMouseX = 0;
         this.lastMouseY = 0;
-        
-        // Physics constants
-        this.repulsionConstant = 3500;
-        this.springConstant = 0.08;
-        this.springLength = 120;
-        this.gravityConstant = 0.02;
-        this.damping = 0.85;
-        this.physicsIterations = 200; // Layout settling limit
+        this.loopRunning = false;
         this.settled = false;
 
-        // Setup event listeners
+        this.repulsionConstant = 4000;
+        this.springConstant = 0.08;
+        this.springLength = 140;
+        this.gravityConstant = 0.025;
+        this.damping = 0.85;
+
         this.setupEvents();
+        this._observeSize();
         this.resize();
     }
 
+    _observeSize() {
+        if (typeof ResizeObserver === 'undefined') return;
+        this._ro = new ResizeObserver(() => {
+            // Pane just became visible or layout changed
+            this.resize();
+            if (this.pending) {
+                const p = this.pending;
+                this.pending = null;
+                this.setData(p.nodesData, p.edgesData);
+            } else if (this.nodes.length) {
+                this.fitToScreen();
+                this.startLoop();
+            }
+        });
+        this._ro.observe(this.canvas.parentElement || this.canvas);
+    }
+
+    _viewSize() {
+        const dpr = window.devicePixelRatio || 1;
+        return {
+            w: this.canvas.width / dpr,
+            h: this.canvas.height / dpr,
+            dpr
+        };
+    }
+
     setData(nodesData, edgesData) {
+        nodesData = nodesData || {};
+        edgesData = edgesData || [];
+
+        const { w, h } = this._viewSize();
+        // Canvas still hidden (0×0) — stash and wait for ResizeObserver / resize
+        if (w < 10 || h < 10) {
+            this.pending = { nodesData, edgesData };
+            this.nodes = [];
+            this.edges = [];
+            this.nodesMap.clear();
+            return;
+        }
+        this.pending = null;
+
         this.nodes = [];
         this.edges = [];
         this.nodesMap.clear();
         this.selectedNode = null;
         this.settled = false;
-        this.autoFitOnSettle = true;
 
-        const width = this.canvas.width / window.devicePixelRatio;
-        const height = this.canvas.height / window.devicePixelRatio;
-        const nodeEntries = Object.entries(nodesData);
-        this.isSingleNode = nodeEntries.length === 1 && edgesData.length === 0;
+        const entries = Object.entries(nodesData);
+        const n = entries.length;
+        const cx = w / 2;
+        const cy = h / 2;
 
-        // Parse nodes
-        nodeEntries.forEach(([key, record], index) => {
-            // Position nodes in a spiral to prevent overlap at origin
-            const angle = index * 0.5;
-            const radius = 30 + index * 10;
+        entries.forEach(([key, record], i) => {
+            // Ring layout so multi-node graphs start spread out; single node at center
+            const angle = n === 1 ? 0 : (i / n) * Math.PI * 2 - Math.PI / 2;
+            const radius = n === 1 ? 0 : Math.min(w, h) * 0.28;
             const node = {
-                key: key,
-                name: record.name,
-                ecosystem: record.ecosystem.toLowerCase(),
+                key,
+                name: record.name || key,
+                ecosystem: String(record.ecosystem || 'unknown').toLowerCase(),
                 version: record.version || 'unknown',
-                status: record.status,
-                confidence: record.confidence,
-                x: this.isSingleNode ? width / 2 : width / 2 + Math.cos(angle) * radius,
-                y: this.isSingleNode ? height / 2 : height / 2 + Math.sin(angle) * radius,
+                status: record.status || 'inferred',
+                confidence: typeof record.confidence === 'number' ? record.confidence : 0,
+                x: cx + Math.cos(angle) * radius,
+                y: cy + Math.sin(angle) * radius,
                 vx: 0,
                 vy: 0,
-                radius: 40,
+                radius: n === 1 ? 52 : 36,
                 data: record
             };
             this.nodes.push(node);
             this.nodesMap.set(key, node);
         });
 
-        // Parse edges
         edgesData.forEach(edge => {
-            const sourceNode = this.nodesMap.get(edge.parent_key);
-            const targetNode = this.nodesMap.get(edge.child_key);
-            if (sourceNode && targetNode) {
+            const source = this.nodesMap.get(edge.parent_key);
+            const target = this.nodesMap.get(edge.child_key);
+            if (source && target) {
                 this.edges.push({
-                    source: sourceNode,
-                    target: targetNode,
+                    source,
+                    target,
                     status: edge.status,
                     confidence: edge.confidence
                 });
@@ -92,259 +126,211 @@ class DependencyGraphRenderer {
 
         this.fitToScreen();
         this.startLoop();
+        // Always paint one frame immediately so something shows even if rAF is delayed
+        this.draw();
     }
 
     resize() {
-        const rect = this.canvas.parentElement.getBoundingClientRect();
+        if (!this.canvas) return;
+        const parent = this.canvas.parentElement;
+        if (!parent) return;
+        const rect = parent.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = rect.height + 'px';
-        this.ctx.scale(dpr, dpr);
-        
-        if (this.nodes.length > 0) {
-            this.settled = false;
-            this.autoFitOnSettle = true;
-            if (this.isSingleNode) {
-                // For a single node, pin it to the new viewport center and skip physics.
-                this.nodes[0].x = rect.width / 2;
-                this.nodes[0].y = rect.height / 2;
-                this.nodes[0].vx = 0;
-                this.nodes[0].vy = 0;
-                this.settled = true;
-                this.fitToScreen();
-                this.draw();
-            } else {
-                this.startLoop();
-            }
+        const w = Math.max(0, Math.floor(rect.width));
+        const h = Math.max(0, Math.floor(rect.height));
+        if (w < 1 || h < 1) return;
+
+        // Only reset bitmap when size actually changes (avoids wiping mid-drag)
+        if (this.canvas.width !== w * dpr || this.canvas.height !== h * dpr) {
+            this.canvas.width = w * dpr;
+            this.canvas.height = h * dpr;
+            this.canvas.style.width = w + 'px';
+            this.canvas.style.height = h + 'px';
+            this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
+
+        if (this.pending && w >= 10 && h >= 10) {
+            const p = this.pending;
+            this.pending = null;
+            this.setData(p.nodesData, p.edgesData);
+            return;
+        }
+
+        if (this.nodes.length) this.draw();
     }
 
     fitToScreen() {
-        if (this.nodes.length === 0) return;
+        if (!this.nodes.length) return;
+        const { w: viewW, h: viewH } = this._viewSize();
+        if (viewW < 10 || viewH < 10) return;
 
-        // Find bounding box
-        let minX = Infinity, maxX = -Infinity;
-        let minY = Infinity, maxY = -Infinity;
-
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         this.nodes.forEach(node => {
-            minX = Math.min(minX, node.x);
-            maxX = Math.max(maxX, node.x);
-            minY = Math.min(minY, node.y);
-            maxY = Math.max(maxY, node.y);
+            minX = Math.min(minX, node.x - node.radius);
+            maxX = Math.max(maxX, node.x + node.radius);
+            minY = Math.min(minY, node.y - node.radius);
+            maxY = Math.max(maxY, node.y + node.radius);
         });
 
-        const graphW = maxX - minX + 160;
-        const graphH = maxY - minY + 160;
-        const viewW = this.canvas.width / window.devicePixelRatio;
-        const viewH = this.canvas.height / window.devicePixelRatio;
+        const pad = 80;
+        const graphW = Math.max(maxX - minX + pad * 2, 120);
+        const graphH = Math.max(maxY - minY + pad * 2, 120);
 
-        const zoomX = viewW / graphW;
-        const zoomY = viewH / graphH;
-        this.zoom = Math.min(0.9, Math.min(zoomX, zoomY));
-        if (this.zoom < 0.2) this.zoom = 0.2;
+        this.zoom = Math.min(1.4, Math.min(viewW / graphW, viewH / graphH));
+        this.zoom = Math.max(0.25, this.zoom);
 
-        this.panX = viewW / 2 - ((minX + maxX) / 2) * this.zoom;
-        this.panY = viewH / 2 - ((minY + maxY) / 2) * this.zoom;
+        const midX = (minX + maxX) / 2;
+        const midY = (minY + maxY) / 2;
+        this.panX = viewW / 2 - midX * this.zoom;
+        this.panY = viewH / 2 - midY * this.zoom;
         this.settled = false;
-        this.startLoop();
+        this.draw();
     }
 
-    // Force physics step
     updatePhysics() {
-        if (this.settled) return;
+        if (this.settled || this.nodes.length <= 1) {
+            this.settled = true;
+            return;
+        }
 
         let maxMotion = 0;
 
-        // 1. Repulsion force between node pairs
         for (let i = 0; i < this.nodes.length; i++) {
-            const nodeA = this.nodes[i];
+            const a = this.nodes[i];
             for (let j = i + 1; j < this.nodes.length; j++) {
-                const nodeB = this.nodes[j];
-                const dx = nodeB.x - nodeA.x;
-                const dy = nodeB.y - nodeA.y;
-                const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-
-                if (distance < 500) {
-                    const force = this.repulsionConstant / (distance * distance);
-                    const fx = (dx / distance) * force;
-                    const fy = (dy / distance) * force;
-
-                    if (nodeA !== this.draggedNode) {
-                        nodeA.vx -= fx;
-                        nodeA.vy -= fy;
-                    }
-                    if (nodeB !== this.draggedNode) {
-                        nodeB.vx += fx;
-                        nodeB.vy += fy;
-                    }
-                }
+                const b = this.nodes[j];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                if (dist > 600) continue;
+                const force = this.repulsionConstant / (dist * dist);
+                const fx = (dx / dist) * force;
+                const fy = (dy / dist) * force;
+                if (a !== this.draggedNode) { a.vx -= fx; a.vy -= fy; }
+                if (b !== this.draggedNode) { b.vx += fx; b.vy += fy; }
             }
         }
 
-        // 2. Attraction force along edges
         this.edges.forEach(edge => {
             const dx = edge.target.x - edge.source.x;
             const dy = edge.target.y - edge.source.y;
-            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-            
-            const force = this.springConstant * (distance - this.springLength);
-            const fx = (dx / distance) * force;
-            const fy = (dy / distance) * force;
-
-            if (edge.source !== this.draggedNode) {
-                edge.source.vx += fx;
-                edge.source.vy += fy;
-            }
-            if (edge.target !== this.draggedNode) {
-                edge.target.vx -= fx;
-                edge.target.vy -= fy;
-            }
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const force = this.springConstant * (dist - this.springLength);
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+            if (edge.source !== this.draggedNode) { edge.source.vx += fx; edge.source.vy += fy; }
+            if (edge.target !== this.draggedNode) { edge.target.vx -= fx; edge.target.vy -= fy; }
         });
 
-        // 3. Gravity/Center pull
-        const centerX = (this.canvas.width / window.devicePixelRatio) / 2;
-        const centerY = (this.canvas.height / window.devicePixelRatio) / 2;
+        const { w, h } = this._viewSize();
+        const cx = w / 2, cy = h / 2;
         this.nodes.forEach(node => {
             if (node === this.draggedNode) return;
-
-            const dx = centerX - node.x;
-            const dy = centerY - node.y;
-            node.vx += dx * this.gravityConstant;
-            node.vy += dy * this.gravityConstant;
-
-            // Apply friction & update positions
+            node.vx += (cx - node.x) * this.gravityConstant;
+            node.vy += (cy - node.y) * this.gravityConstant;
             node.vx *= this.damping;
             node.vy *= this.damping;
-            
             node.x += node.vx;
             node.y += node.vy;
-
-            const motion = node.vx * node.vx + node.vy * node.vy;
-            maxMotion = Math.max(maxMotion, motion);
+            maxMotion = Math.max(maxMotion, node.vx * node.vx + node.vy * node.vy);
         });
 
-        // Settle condition
-        if (maxMotion < 0.05 && !this.draggedNode) {
-            this.settled = true;
-        }
+        if (maxMotion < 0.04 && !this.draggedNode) this.settled = true;
     }
 
-    // Render Canvas frame
     draw() {
+        if (!this.ctx) return;
+        const { w, h } = this._viewSize();
+        if (w < 1 || h < 1) return;
+
         const ctx = this.ctx;
-        const width = this.canvas.width / window.devicePixelRatio;
-        const height = this.canvas.height / window.devicePixelRatio;
-
-        ctx.clearRect(0, 0, width, height);
-
-        // Apply translation and zoom transformations
         ctx.save();
+        ctx.setTransform((window.devicePixelRatio || 1), 0, 0, (window.devicePixelRatio || 1), 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        // Empty state
+        if (!this.nodes.length) {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '14px Outfit, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(
+                this.pending ? 'Waiting for layout…' : 'No dependency nodes in this report',
+                w / 2, h / 2
+            );
+            ctx.restore();
+            return;
+        }
+
         ctx.translate(this.panX, this.panY);
         ctx.scale(this.zoom, this.zoom);
 
-        // Draw edges
+        // Edges
         this.edges.forEach(edge => {
             ctx.beginPath();
             ctx.moveTo(edge.source.x, edge.source.y);
             ctx.lineTo(edge.target.x, edge.target.y);
-            
-            // Solid/dashed lines depending on confirmation status
-            ctx.strokeStyle = edge.status === 'confirmed' ? 'rgba(79, 172, 254, 0.4)' : 'rgba(100, 116, 139, 0.25)';
-            ctx.lineWidth = edge.status === 'confirmed' ? 2 : 1;
-            if (edge.status !== 'confirmed') {
-                ctx.setLineDash([5, 5]);
-            } else {
-                ctx.setLineDash([]);
-            }
+            const confirmed = edge.status === 'confirmed';
+            ctx.strokeStyle = confirmed ? 'rgba(79, 172, 254, 0.7)' : 'rgba(148, 163, 184, 0.45)';
+            ctx.lineWidth = confirmed ? 2.5 : 1.5;
+            ctx.setLineDash(confirmed ? [] : [6, 5]);
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Draw edge arrows
             const angle = Math.atan2(edge.target.y - edge.source.y, edge.target.x - edge.source.x);
-            const arrowLength = 8;
-            const arrowOffset = edge.target.radius + 2; // stop at boundary
-            const arrowX = edge.target.x - arrowOffset * Math.cos(angle);
-            const arrowY = edge.target.y - arrowOffset * Math.sin(angle);
-
+            const tip = edge.target.radius + 2;
+            const ax = edge.target.x - tip * Math.cos(angle);
+            const ay = edge.target.y - tip * Math.sin(angle);
+            const al = 10;
             ctx.beginPath();
-            ctx.moveTo(arrowX, arrowY);
-            ctx.lineTo(arrowX - arrowLength * Math.cos(angle - Math.PI / 6), arrowY - arrowLength * Math.sin(angle - Math.PI / 6));
-            ctx.lineTo(arrowX - arrowLength * Math.cos(angle + Math.PI / 6), arrowY - arrowLength * Math.sin(angle + Math.PI / 6));
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(ax - al * Math.cos(angle - Math.PI / 6), ay - al * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(ax - al * Math.cos(angle + Math.PI / 6), ay - al * Math.sin(angle + Math.PI / 6));
             ctx.closePath();
-            ctx.fillStyle = edge.status === 'confirmed' ? 'rgba(79, 172, 254, 0.4)' : 'rgba(100, 116, 139, 0.25)';
+            ctx.fillStyle = ctx.strokeStyle;
             ctx.fill();
         });
 
-        // Draw nodes
+        // Nodes — high-contrast fills so bubbles are obvious on dark bg
         this.nodes.forEach(node => {
+            const palette = {
+                npm: { fill: 'rgba(239, 68, 68, 0.55)', stroke: '#f87171', glow: 'rgba(239, 68, 68, 0.55)' },
+                github: { fill: 'rgba(6, 182, 212, 0.55)', stroke: '#22d3ee', glow: 'rgba(6, 182, 212, 0.55)' },
+                wayback: { fill: 'rgba(168, 85, 247, 0.55)', stroke: '#c084fc', glow: 'rgba(168, 85, 247, 0.55)' },
+                sbom: { fill: 'rgba(59, 130, 246, 0.55)', stroke: '#60a5fa', glow: 'rgba(59, 130, 246, 0.55)' },
+                pypi: { fill: 'rgba(250, 204, 21, 0.5)', stroke: '#facc15', glow: 'rgba(250, 204, 21, 0.5)' },
+            };
+            const c = palette[node.ecosystem] || { fill: 'rgba(100, 116, 139, 0.6)', stroke: '#94a3b8', glow: 'rgba(148, 163, 184, 0.5)' };
+            const selected = this.selectedNode === node;
+
             ctx.beginPath();
-            ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
-            
-            // Ecosystem color coding
-            let fillStyle = '#1e293b';
-            let strokeStyle = '#475569';
-            let shadowColor = 'transparent';
-
-            if (node.ecosystem === 'npm') {
-                fillStyle = 'rgba(239, 68, 68, 0.15)';
-                strokeStyle = 'rgba(239, 68, 68, 0.6)';
-                shadowColor = 'rgba(239, 68, 68, 0.2)';
-            } else if (node.ecosystem === 'github') {
-                fillStyle = 'rgba(6, 182, 212, 0.15)';
-                strokeStyle = 'rgba(6, 182, 212, 0.6)';
-                shadowColor = 'rgba(6, 182, 212, 0.2)';
-            } else if (node.ecosystem === 'wayback') {
-                fillStyle = 'rgba(168, 85, 247, 0.15)';
-                strokeStyle = 'rgba(168, 85, 247, 0.6)';
-                shadowColor = 'rgba(168, 85, 247, 0.2)';
-            } else if (node.ecosystem === 'sbom') {
-                fillStyle = 'rgba(59, 130, 246, 0.15)';
-                strokeStyle = 'rgba(59, 130, 246, 0.6)';
-                shadowColor = 'rgba(59, 130, 246, 0.2)';
-            }
-
-            // Highlighting selection
-            if (this.selectedNode === node) {
-                strokeStyle = '#00f2fe';
-                shadowColor = 'rgba(0, 242, 254, 0.6)';
-                ctx.lineWidth = 3;
-            } else {
-                ctx.lineWidth = 1.5;
-            }
-
-            ctx.fillStyle = fillStyle;
+            ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+            ctx.shadowColor = selected ? 'rgba(0, 242, 254, 0.9)' : c.glow;
+            ctx.shadowBlur = selected ? 28 : 18;
+            ctx.fillStyle = c.fill;
             ctx.fill();
+            ctx.shadowBlur = 0;
 
-            // Set borders depending on confirm status
-            if (node.status !== 'confirmed') {
-                ctx.setLineDash([4, 4]);
-            } else {
-                ctx.setLineDash([]);
-            }
-            ctx.strokeStyle = strokeStyle;
+            ctx.lineWidth = selected ? 3.5 : 2.5;
+            ctx.strokeStyle = selected ? '#00f2fe' : c.stroke;
+            ctx.setLineDash(node.status === 'confirmed' ? [] : [5, 4]);
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Draw text details inside node
-            ctx.fillStyle = '#f8fafc';
-            ctx.font = 'bold 11px Outfit, sans-serif';
+            // Text
+            let name = node.name;
+            if (name.length > 12) name = name.slice(0, 10) + '…';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-
-            // Text Truncation
-            let displayName = node.name;
-            if (displayName.length > 10) displayName = displayName.slice(0, 8) + '..';
-            ctx.fillText(displayName, node.x, node.y - 8);
-
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '10px Outfit, sans-serif';
-            ctx.fillText(node.version, node.x, node.y + 6);
-
-            ctx.fillStyle = '#64748b';
-            ctx.font = '9px JetBrains Mono, monospace';
-            ctx.fillText(node.ecosystem.toUpperCase(), node.x, node.y + 18);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px Outfit, system-ui, sans-serif';
+            ctx.fillText(name, node.x, node.y - 10);
+            ctx.fillStyle = '#e2e8f0';
+            ctx.font = '11px Outfit, system-ui, sans-serif';
+            ctx.fillText(String(node.version), node.x, node.y + 6);
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = '10px JetBrains Mono, monospace';
+            ctx.fillText(node.ecosystem.toUpperCase(), node.x, node.y + 20);
         });
 
         ctx.restore();
@@ -353,20 +339,9 @@ class DependencyGraphRenderer {
     startLoop() {
         if (this.loopRunning) return;
         this.loopRunning = true;
-
         const tick = () => {
             this.updatePhysics();
-
-            // Fit the camera once the layout has settled so a single-node graph
-            // (or any settling graph) is centered in the viewport rather than
-            // being pinned to the initial spiral origin.
-            if (this.settled && this.autoFitOnSettle && !this.draggedNode) {
-                this.autoFitOnSettle = false;
-                this.fitToScreen();
-            }
-
             this.draw();
-
             if (!this.settled || this.draggedNode) {
                 requestAnimationFrame(tick);
             } else {
@@ -377,40 +352,28 @@ class DependencyGraphRenderer {
     }
 
     setupEvents() {
-        // Translate screen mouse coordinates to transformed graph coordinate system
         const getGraphCoords = (e) => {
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
             return {
-                x: (x - this.panX) / this.zoom,
-                y: (y - this.panY) / this.zoom
+                x: (e.clientX - rect.left - this.panX) / this.zoom,
+                y: (e.clientY - rect.top - this.panY) / this.zoom
             };
         };
 
         this.canvas.addEventListener('mousedown', e => {
             const coords = getGraphCoords(e);
-            
-            // Check if node clicked
-            let clickedNode = null;
+            let clicked = null;
             for (let i = this.nodes.length - 1; i >= 0; i--) {
-                const node = this.nodes[i];
-                const dx = coords.x - node.x;
-                const dy = coords.y - node.y;
-                if (dx * dx + dy * dy < node.radius * node.radius) {
-                    clickedNode = node;
-                    break;
-                }
+                const n = this.nodes[i];
+                const dx = coords.x - n.x, dy = coords.y - n.y;
+                if (dx * dx + dy * dy <= n.radius * n.radius) { clicked = n; break; }
             }
-
-            if (clickedNode) {
-                this.draggedNode = clickedNode;
-                this.selectedNode = clickedNode;
+            if (clicked) {
+                this.draggedNode = clicked;
+                this.selectedNode = clicked;
                 this.settled = false;
                 this.startLoop();
-                if (this.onNodeSelected) {
-                    this.onNodeSelected(clickedNode.data);
-                }
+                if (this.onNodeSelected) this.onNodeSelected(clicked.data);
             } else {
                 this.isPanning = true;
                 this.lastMouseX = e.clientX;
@@ -420,18 +383,16 @@ class DependencyGraphRenderer {
 
         window.addEventListener('mousemove', e => {
             if (this.draggedNode) {
-                const coords = getGraphCoords(e);
-                this.draggedNode.x = coords.x;
-                this.draggedNode.y = coords.y;
+                const c = getGraphCoords(e);
+                this.draggedNode.x = c.x;
+                this.draggedNode.y = c.y;
                 this.draggedNode.vx = 0;
                 this.draggedNode.vy = 0;
                 this.settled = false;
                 this.startLoop();
             } else if (this.isPanning) {
-                const dx = e.clientX - this.lastMouseX;
-                const dy = e.clientY - this.lastMouseY;
-                this.panX += dx;
-                this.panY += dy;
+                this.panX += e.clientX - this.lastMouseX;
+                this.panY += e.clientY - this.lastMouseY;
                 this.lastMouseX = e.clientX;
                 this.lastMouseY = e.clientY;
                 this.draw();
@@ -446,31 +407,18 @@ class DependencyGraphRenderer {
         this.canvas.addEventListener('wheel', e => {
             e.preventDefault();
             const rect = this.canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            const graphMouseX = (mouseX - this.panX) / this.zoom;
-            const graphMouseY = (mouseY - this.panY) / this.zoom;
-
-            const zoomFactor = 1.1;
-            if (e.deltaY < 0) {
-                this.zoom *= zoomFactor;
-            } else {
-                this.zoom /= zoomFactor;
-            }
-
-            this.zoom = Math.max(0.15, Math.min(this.zoom, 5.0));
-
-            // Adjust translation to keep mouse anchor stable
-            this.panX = mouseX - graphMouseX * this.zoom;
-            this.panY = mouseY - graphMouseY * this.zoom;
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const gx = (mx - this.panX) / this.zoom;
+            const gy = (my - this.panY) / this.zoom;
+            const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+            this.zoom = Math.max(0.15, Math.min(5, this.zoom * factor));
+            this.panX = mx - gx * this.zoom;
+            this.panY = my - gy * this.zoom;
             this.draw();
-        });
+        }, { passive: false });
 
-        // Handle resize
-        window.addEventListener('resize', () => {
-            this.resize();
-        });
+        window.addEventListener('resize', () => this.resize());
     }
 }
 window.DependencyGraphRenderer = DependencyGraphRenderer;

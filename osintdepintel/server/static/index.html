@@ -408,7 +408,8 @@
                                 <div class="sub-tab-pane" id="subtab-graph">
                                     <div class="graph-viewport-container">
                                         <div class="graph-instructions">
-                                            <span>🖱️ Left-Click: select node details | 🖱️ Drag: move node | 🖱️ Drag Background: pan | 📜 Scroll: zoom</span>
+                                            <span>Click node · drag · pan bg · scroll zoom</span>
+                                            <span id="graph-node-count" class="graph-node-count">0 nodes</span>
                                             <button class="btn btn-xs btn-secondary" id="graph-reset-btn">Fit Graph</button>
                                         </div>
                                         <canvas id="dependency-graph-canvas"></canvas>
@@ -472,7 +473,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="graph-renderer.js"></script>
-    <script src="app.js"></script>
+    <script src="graph-renderer.js?v=20260724b"></script>
+    <script src="app.js?v=20260724b"></script>
 </body>
 </html>

@@ -515,6 +515,16 @@ def stream_logs() -> StreamingResponse:
     return StreamingResponse(log_generator(), media_type="text/event-stream")
 
 
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    # Force revalidation of static assets; otherwise browsers heuristically cache
+    # app.js/graph-renderer.js and code fixes never reach an open dashboard tab.
+    response = await call_next(request)
+    if not request.url.path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 # Host static files
 static_dir = Path(__file__).resolve().parent / "static"
 if static_dir.exists():

@@ -932,24 +932,50 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     // DEPENDENCY GRAPH RENDERING
     // ==========================================================================
+    function _graphPayload(report) {
+        // Prefer structured graph; fall back to flat dependencies list so the
+        // canvas always has something to draw when a scan found packages.
+        const graph = report.graph || {};
+        let nodes = graph.nodes || {};
+        let edges = graph.edges || [];
+        if (!Object.keys(nodes).length && Array.isArray(report.dependencies)) {
+            nodes = {};
+            report.dependencies.forEach(dep => {
+                const key = dep.key || `${dep.ecosystem || 'unk'}:${dep.name}@${dep.version || 'unknown'}`;
+                nodes[key] = dep;
+            });
+        }
+        return { nodes, edges };
+    }
+
     function renderGraphTab() {
         if (!state.activeReport) return;
-        const graph = state.activeReport.graph || {};
-        const nodes = graph.nodes || {};
-        const edges = graph.edges || [];
-        if (!Object.keys(nodes).length && !edges.length) return;
+        const { nodes, edges } = _graphPayload(state.activeReport);
+        const countEl = document.getElementById('graph-node-count');
+        if (countEl) {
+            countEl.textContent = `${Object.keys(nodes).length} nodes · ${edges.length} edges`;
+        }
 
         if (!state.graphRenderer) {
+            if (!window.DependencyGraphRenderer) {
+                console.error('DependencyGraphRenderer not loaded');
+                return;
+            }
             state.graphRenderer = new window.DependencyGraphRenderer('dependency-graph-canvas', (nodeData) => {
                 openNodeDrawer(nodeData);
             });
         }
 
+        // Always push data — renderer defers if canvas is still 0×0 (hidden tab)
         state.graphRenderer.setData(nodes, edges);
     }
 
     elements.graphResetBtn.addEventListener('click', () => {
-        if (state.graphRenderer) state.graphRenderer.fitToScreen();
+        if (state.graphRenderer) {
+            state.graphRenderer.resize();
+            state.graphRenderer.fitToScreen();
+            state.graphRenderer.startLoop();
+        }
     });
 
     // Node drawer details selection
@@ -1019,11 +1045,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (subtabId === 'graph') {
-                setTimeout(() => {
+                // Pane is now display:block — rebuild after layout so canvas has real size
+                requestAnimationFrame(() => {
+                    renderGraphTab();
                     if (state.graphRenderer) {
                         state.graphRenderer.resize();
+                        state.graphRenderer.fitToScreen();
+                        state.graphRenderer.startLoop();
                     }
-                }, 50);
+                });
             }
         });
     });

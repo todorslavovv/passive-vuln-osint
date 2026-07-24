@@ -1042,10 +1042,17 @@ body {
     color: var(--text-secondary);
 }
 
+.graph-node-count {
+    color: var(--accent-cyan, #00f2fe);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+}
+
 #dependency-graph-canvas {
     width: 100%;
     height: 100%;
     display: block;
+    cursor: grab;
 }
 
 /* Sliding side drawer */
