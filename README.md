@@ -167,3 +167,7 @@ Tests use fixtures from `tests/fixtures/offline_intel.json` and do not require n
 - GitHub Advisory Database is represented through OSV overlap unless a richer authenticated provider is added.
 - NVD keyword matching is supplemental because precise CPE matching is difficult across package ecosystems without curated mappings.
 - Offline sample findings are demonstration fixtures, not assertions that any live target is vulnerable.
+
+## License
+
+[MIT](LICENSE) — see [LICENSE](LICENSE) for the full text.
