@@ -46,12 +46,15 @@ class DependencyGraphRenderer {
         this.nodesMap.clear();
         this.selectedNode = null;
         this.settled = false;
+        this.autoFitOnSettle = true;
 
         const width = this.canvas.width / window.devicePixelRatio;
         const height = this.canvas.height / window.devicePixelRatio;
+        const nodeEntries = Object.entries(nodesData);
+        this.isSingleNode = nodeEntries.length === 1 && edgesData.length === 0;
 
         // Parse nodes
-        Object.entries(nodesData).forEach(([key, record], index) => {
+        nodeEntries.forEach(([key, record], index) => {
             // Position nodes in a spiral to prevent overlap at origin
             const angle = index * 0.5;
             const radius = 30 + index * 10;
@@ -62,8 +65,8 @@ class DependencyGraphRenderer {
                 version: record.version || 'unknown',
                 status: record.status,
                 confidence: record.confidence,
-                x: width / 2 + Math.cos(angle) * radius,
-                y: height / 2 + Math.sin(angle) * radius,
+                x: this.isSingleNode ? width / 2 : width / 2 + Math.cos(angle) * radius,
+                y: this.isSingleNode ? height / 2 : height / 2 + Math.sin(angle) * radius,
                 vx: 0,
                 vy: 0,
                 radius: 40,
@@ -102,7 +105,19 @@ class DependencyGraphRenderer {
         
         if (this.nodes.length > 0) {
             this.settled = false;
-            this.startLoop();
+            this.autoFitOnSettle = true;
+            if (this.isSingleNode) {
+                // For a single node, pin it to the new viewport center and skip physics.
+                this.nodes[0].x = rect.width / 2;
+                this.nodes[0].y = rect.height / 2;
+                this.nodes[0].vx = 0;
+                this.nodes[0].vy = 0;
+                this.settled = true;
+                this.fitToScreen();
+                this.draw();
+            } else {
+                this.startLoop();
+            }
         }
     }
 
@@ -338,9 +353,18 @@ class DependencyGraphRenderer {
     startLoop() {
         if (this.loopRunning) return;
         this.loopRunning = true;
-        
+
         const tick = () => {
             this.updatePhysics();
+
+            // Fit the camera once the layout has settled so a single-node graph
+            // (or any settling graph) is centered in the viewport rather than
+            // being pinned to the initial spiral origin.
+            if (this.settled && this.autoFitOnSettle && !this.draggedNode) {
+                this.autoFitOnSettle = false;
+                this.fitToScreen();
+            }
+
             this.draw();
 
             if (!this.settled || this.draggedNode) {

@@ -935,9 +935,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderGraphTab() {
         if (!state.activeReport) return;
         const graph = state.activeReport.graph || {};
-        const nodes = graph.nodes || [];
+        const nodes = graph.nodes || {};
         const edges = graph.edges || [];
-        if (!nodes.length && !edges.length) return;
+        if (!Object.keys(nodes).length && !edges.length) return;
 
         if (!state.graphRenderer) {
             state.graphRenderer = new window.DependencyGraphRenderer('dependency-graph-canvas', (nodeData) => {
@@ -1022,7 +1022,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => {
                     if (state.graphRenderer) {
                         state.graphRenderer.resize();
-                        state.graphRenderer.fitToScreen();
                     }
                 }, 50);
             }
