@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from osintdepintel.cli import _handle_signal, build_parser, main
+from osintdepintel.cli import _gate_breaches, _handle_signal, build_parser, main
 
 
 @pytest.fixture(autouse=True)
@@ -307,3 +307,78 @@ class CliEntryPointTests:
         )
         assert result.returncode != 0
         assert "error" in result.stderr.lower()
+
+
+_GATE_REPORTS = [
+    {
+        "target": {"name": "site-a"},
+        "findings": [
+            {"vulnerability": {"severity": "HIGH", "vulnerability_id": "CVE-1", "package_name": "lodash"}},
+            {"vulnerability": {"severity": "LOW", "vulnerability_id": "CVE-2", "package_name": "left-pad"}},
+        ],
+    },
+    {
+        "target": {"name": "site-b"},
+        "findings": [
+            {"vulnerability": {"severity": "MEDIUM", "vulnerability_id": "CVE-3", "package_name": "jquery"}},
+        ],
+    },
+]
+
+
+class SeverityGateTests:
+    def test_gate_breaches_high_threshold(self) -> None:
+        breaches = _gate_breaches(_GATE_REPORTS, "high")
+        assert len(breaches) == 1
+        assert breaches[0]["vulnerability_id"] == "CVE-1"
+
+    def test_gate_breaches_low_threshold_matches_all(self) -> None:
+        breaches = _gate_breaches(_GATE_REPORTS, "low")
+        assert len(breaches) == 3
+
+    def test_gate_breaches_critical_threshold_matches_none(self) -> None:
+        assert _gate_breaches(_GATE_REPORTS, "critical") == []
+
+    def test_gate_breaches_unknown_severity_ignored(self) -> None:
+        reports = [{"target": {"name": "x"}, "findings": [{"vulnerability": {"severity": "UNKNOWN"}}]}]
+        assert _gate_breaches(reports, "low") == []
+
+    def _run_with_fail_on(self, reports: list, threshold: str) -> int:
+        mock_pipeline = MagicMock()
+        result = {
+            "reports": reports,
+            "aggregate": {
+                "aggregate": {
+                    "target_count": len(reports),
+                    "dependency_count": 0,
+                    "vulnerability_count": 0,
+                    "finding_count": sum(len(r["findings"]) for r in reports),
+                }
+            },
+            "paths": {},
+        }
+        mock_pipeline.process_targets.return_value = result
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch("osintdepintel.cli.Pipeline", return_value=mock_pipeline),
+            patch(
+                "osintdepintel.cli.sys.argv",
+                [
+                    "osintdepintel",
+                    "--config",
+                    str(Path(__file__).parent.parent / "examples" / "targets.json"),
+                    "--all",
+                    "--output-dir",
+                    tmp,
+                    "--fail-on",
+                    threshold,
+                ],
+            ),
+        ):
+            return main()
+
+    def test_main_fail_on_trips_exit_code_3(self) -> None:
+        assert self._run_with_fail_on(_GATE_REPORTS, "high") == 3
+
+    def test_main_fail_on_passes_returns_zero(self) -> None:
+        assert self._run_with_fail_on(_GATE_REPORTS, "critical") == 0

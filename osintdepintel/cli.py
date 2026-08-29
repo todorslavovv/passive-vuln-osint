@@ -16,6 +16,33 @@ from .pipeline import Pipeline
 
 _shutdown_requested = False
 
+# Exit code returned when --fail-on trips the severity gate. Kept distinct from
+# argparse's usage error (2) so CI can tell "risky finding" apart from "bad invocation".
+SEVERITY_GATE_EXIT_CODE = 3
+
+_SEVERITY_RANK = {"UNKNOWN": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+
+
+def _gate_breaches(reports: list[dict[str, Any]], threshold: str) -> list[dict[str, str]]:
+    """Return findings whose vulnerability severity meets or exceeds the threshold."""
+    threshold_rank = _SEVERITY_RANK[threshold.upper()]
+    breaches: list[dict[str, str]] = []
+    for report in reports:
+        target_name = report.get("target", {}).get("name", "unknown")
+        for finding in report.get("findings", []):
+            vuln = finding.get("vulnerability", {})
+            severity = str(vuln.get("severity", "UNKNOWN")).upper()
+            if _SEVERITY_RANK.get(severity, 0) >= threshold_rank:
+                breaches.append(
+                    {
+                        "target": target_name,
+                        "severity": severity,
+                        "vulnerability_id": str(vuln.get("vulnerability_id", "UNKNOWN")),
+                        "package": str(vuln.get("package_name", "")),
+                    }
+                )
+    return breaches
+
 
 def _handle_signal(signum: int, _frame: Any) -> None:
     global _shutdown_requested
@@ -68,9 +95,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--log-file", help="Path to log file (default: stderr only).")
     parser.add_argument("--log-json", action="store_true", help="Output logs in JSON format.")
     parser.add_argument(
-        "--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Logging level."
+        "--log-level",
+        default=None,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging level (default: OSINTDEPINTEL_LOG_LEVEL env or INFO).",
     )
     parser.add_argument("--rate-limit", type=float, default=4.0, help="Maximum HTTP requests per second.")
+    parser.add_argument(
+        "--fail-on",
+        choices=["critical", "high", "medium", "low"],
+        default=None,
+        help=(
+            "Exit with a non-zero status (3) if any finding has a vulnerability at or above this "
+            "severity. Use in CI/CD to block releases on risky dependencies."
+        ),
+    )
     parser.add_argument("--server", action="store_true", help="Start the web dashboard server.")
     parser.add_argument("--host", default="127.0.0.1", help="Host address for the server.")
     parser.add_argument("--port", type=int, default=8000, help="Port for the server.")
@@ -161,4 +200,18 @@ def main(argv: list[str] | None = None) -> int:
         aggregate["dependency_count"],
         aggregate["finding_count"],
     )
+
+    fail_on = getattr(args, "fail_on", None)
+    if fail_on:
+        breaches = _gate_breaches(result["reports"], fail_on)
+        if breaches:
+            print(f"\nSeverity gate: FAILED — {len(breaches)} finding(s) at or above {fail_on.upper()}:")
+            for breach in breaches:
+                print(
+                    f"- [{breach['severity']}] {breach['vulnerability_id']} in {breach['package']} ({breach['target']})"
+                )
+            logger.error("Severity gate tripped: %d finding(s) at or above %s", len(breaches), fail_on.upper())
+            return SEVERITY_GATE_EXIT_CODE
+        print(f"\nSeverity gate: PASSED — no findings at or above {fail_on.upper()}.")
+
     return 0
