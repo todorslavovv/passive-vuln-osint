@@ -411,7 +411,7 @@ def _severity_from_score(score: float | None) -> str:
 
 def _nvd_summary(cve: dict[str, Any]) -> str:
     descriptions = cve.get("descriptions", [])
-    if not isinstance(descriptions, list):
+    if not isinstance(descriptions, list) or not descriptions:
         return ""
     for desc in descriptions:
         if isinstance(desc, dict) and desc.get("lang") == "en":
