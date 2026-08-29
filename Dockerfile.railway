@@ -1,0 +1,30 @@
+# Dashboard/server image for Railway (or any container host).
+# Runs the FastAPI dashboard from the source tree so the static assets and the
+# bundled example targets are present (the CLI Dockerfile builds a wheel, which
+# intentionally omits those). Binds to Railway's injected $PORT.
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+# Server runtime deps only. The core package itself has no third-party deps.
+RUN pip install --no-cache-dir "fastapi>=0.100.0" "uvicorn>=0.20.0"
+
+COPY osintdepintel/ ./osintdepintel/
+COPY examples/ ./examples/
+
+# Non-root user; make config and reports writable (the dashboard edits targets
+# and writes reports at runtime).
+RUN groupadd -r osint && useradd -r -g osint -d /app -s /sbin/nologin osint \
+    && mkdir -p /app/reports \
+    && chown -R osint:osint /app
+USER osint
+
+# Config/output are env-overridable (see server/main.py). OPENCODE_API_KEY is set
+# in the Railway dashboard, not baked into the image; when present, every scan
+# gets an OpenCode (Muse Spark) summary automatically.
+ENV OSINT_CONFIG_PATH=/app/examples/targets.json \
+    OSINT_OUTPUT_DIR=/app/reports \
+    OPENCODE_MODEL=muse-spark-1.2-contributor-free
+
+EXPOSE 8000
+CMD ["sh", "-c", "python -m osintdepintel --server --host 0.0.0.0 --port ${PORT:-8000} --config ${OSINT_CONFIG_PATH}"]
