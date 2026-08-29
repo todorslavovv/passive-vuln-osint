@@ -41,15 +41,20 @@ The dashboard can generate a separate AI summary for each scanned website:
 
 - **NVIDIA** — choose from `nvidia/nemotron-3-ultra-550b-a55b`, `nvidia/llama-3.1-nemotron-70b-instruct`, and `nvidia/mistralai/mixtral-8x22b-instruct-v0.1`.
 - **Gemini** — choose from `gemini-1.5-flash`, `gemini-1.5-flash-8b`, `gemini-1.5-pro`, and `gemini-2.0-flash`.
+- **OpenCode Zen** — an OpenAI-compatible gateway. Defaults to the free `muse-spark-1.2-contributor-free` model; any id from `https://opencode.ai/zen/v1/models` works (e.g. `nemotron-3-ultra-free`).
 
 API keys can be pasted in the UI or set as environment variables:
 
 ```powershell
 $env:NVIDIA_API_KEY="your-key"
 $env:GEMINI_API_KEY="your-key"
+$env:OPENCODE_API_KEY="your-key"
+$env:OPENCODE_MODEL="muse-spark-1.2-contributor-free"  # optional override
 ```
 
-If no key is provided, the scanner writes a fallback explanation to the per-target summary file so the report remains complete.
+When `OPENCODE_API_KEY` is set in the environment, the dashboard generates an OpenCode summary for every scanned target automatically — no UI toggle needed (this is the Railway deployment path). It is also available on the CLI with `--opencode-summary` (and `--opencode-model`).
+
+If no key is provided, the scanner writes a deterministic local-fallback explanation to the per-target summary file so the report remains complete. The same fallback is used if a provider is temporarily unavailable, so a scan never fails because of an AI error.
 
 ### Report artifacts
 
@@ -62,12 +67,35 @@ For each target, the dashboard and CLI write:
 - `reports/<target>_spdx.json` — SPDX SBOM.
 - `reports/<target>_nvidia_summary.txt` — per-target NVIDIA AI summary.
 - `reports/<target>_gemini_summary.txt` — per-target Gemini AI summary.
+- `reports/<target>_opencode_summary.txt` — per-target OpenCode (Muse Spark) AI summary.
 
 It also writes:
 
 - `reports/aggregate_report.json` — aggregate summary across processed targets.
 
 Re-scanning the same target overwrites the previous report files, so the report list stays clean.
+
+## Deploy the dashboard on Railway
+
+The repo ships a container image and Railway config for the web dashboard:
+
+- `Dockerfile.railway` — runs the FastAPI dashboard from source (so the static assets and example targets are present) and binds to Railway's injected `$PORT`.
+- `railway.json` — points Railway at that Dockerfile.
+
+Steps:
+
+1. Create a new Railway project from this GitHub repo (Railway auto-detects `railway.json`).
+2. In the service **Variables**, add `OPENCODE_API_KEY` (and optionally `OPENCODE_MODEL`, default `muse-spark-1.2-contributor-free`). With the key set, every scan gets an OpenCode summary automatically.
+3. Deploy. Railway assigns a public URL; the container serves the dashboard on `$PORT`.
+
+The container reads its config from `OSINT_CONFIG_PATH` and writes reports to `OSINT_OUTPUT_DIR` (both preset in the image). Railway's filesystem is ephemeral — attach a volume at the output dir if you want reports to persist across restarts.
+
+To build/run the same image locally:
+
+```bash
+docker build -f Dockerfile.railway -t osintdepintel-web .
+docker run --rm -p 8000:8000 -e OPENCODE_API_KEY="your-key" osintdepintel-web
+```
 
 ## CLI Usage
 

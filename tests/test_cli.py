@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from osintdepintel.ai_summary import OPENCODE_DEFAULT_MODEL
 from osintdepintel.cli import _gate_breaches, _handle_signal, build_parser, main
 
 
@@ -214,6 +215,48 @@ class BuildParserTests:
         ):
             ret = main()
             assert ret == 0
+
+    def test_opencode_summary_without_api_key_skips(self) -> None:
+        mock_pipeline = MagicMock()
+        mock_pipeline.process_targets.return_value = dict(_BUILDER_RESULT)
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("osintdepintel.cli.Pipeline", return_value=mock_pipeline),
+            patch(
+                "osintdepintel.cli.sys.argv",
+                [
+                    "osintdepintel",
+                    "--config",
+                    str(Path(__file__).parent.parent / "examples" / "targets.json"),
+                    "--all",
+                    "--opencode-summary",
+                ],
+            ),
+        ):
+            assert main() == 0
+
+    def test_opencode_summary_with_key_invokes_writer(self) -> None:
+        mock_pipeline = MagicMock()
+        mock_pipeline.process_targets.return_value = dict(_BUILDER_RESULT_PATHS)
+        with (
+            patch.dict(os.environ, {"OPENCODE_API_KEY": "test-key"}, clear=True),
+            patch("osintdepintel.cli.Pipeline", return_value=mock_pipeline),
+            patch("osintdepintel.cli.write_opencode_summary") as mock_writer,
+            patch(
+                "osintdepintel.cli.sys.argv",
+                [
+                    "osintdepintel",
+                    "--config",
+                    str(Path(__file__).parent.parent / "examples" / "targets.json"),
+                    "--all",
+                    "--opencode-summary",
+                ],
+            ),
+        ):
+            mock_writer.return_value = Path("/tmp/opencode_human_summary.txt")
+            assert main() == 0
+            mock_writer.assert_called_once()
+            assert mock_writer.call_args.args[3] == OPENCODE_DEFAULT_MODEL
 
     def test_output_paths_printed(self) -> None:
         mock_pipeline = MagicMock()

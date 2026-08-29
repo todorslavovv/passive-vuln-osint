@@ -10,6 +10,87 @@ from .reporting.writers import _safe_filename
 
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+# OpenCode Zen is an OpenAI-compatible chat-completions gateway (Bearer auth).
+OPENCODE_BASE_URL = "https://opencode.ai/zen/v1/chat/completions"
+OPENCODE_DEFAULT_MODEL = "muse-spark-1.2-contributor-free"
+
+_OPENCODE_SYSTEM = (
+    "You explain passive OSINT dependency intelligence reports in simple human language. "
+    "Do not claim exploitability unless the report proves it. Say exploit signals are suggested leads."
+)
+
+
+def _opencode_chat(prompt: str, api_key: str, model: str, timeout: int) -> str:
+    """Call the OpenCode Zen OpenAI-compatible endpoint and return the message text.
+
+    max_tokens is kept modest to limit output-token spend; no reasoning/thinking
+    parameters are sent so the model answers directly (cheaper, and plenty for a
+    plain-language summary).
+    """
+    client = HttpClient(timeout=timeout)
+    response = client.post_json(
+        OPENCODE_BASE_URL,
+        {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": _OPENCODE_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "top_p": 0.95,
+            "max_tokens": 2048,
+        },
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    return str(response["choices"][0]["message"]["content"]).strip()
+
+
+def write_opencode_summary(
+    aggregate_report: dict[str, Any],
+    output_dir: Path,
+    api_key: str,
+    model: str = OPENCODE_DEFAULT_MODEL,
+    timeout: int = 120,
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "opencode_human_summary.txt"
+    prompt = _summary_prompt(aggregate_report)
+    try:
+        text = _clean_text(_opencode_chat(prompt, api_key, model, timeout))
+        if not _looks_readable(text):
+            text = _local_fallback_summary(
+                aggregate_report,
+                "OpenCode summary response was not readable, so a deterministic local summary was written.",
+            )
+    except (HttpError, KeyError, IndexError, TypeError) as exc:
+        text = _local_fallback_summary(aggregate_report, f"OpenCode summary failed: {exc}")
+    summary_path.write_text(_clean_text(text) + "\n", encoding="utf-8")
+    return summary_path
+
+
+def write_opencode_target_summary(
+    target_report: dict[str, Any],
+    output_dir: Path,
+    api_key: str,
+    model: str,
+    target_name: str,
+    timeout: int = 120,
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    safe_stem = _safe_filename(target_name)
+    summary_path = output_dir / f"{safe_stem}_opencode_summary.txt"
+    prompt = _target_summary_prompt(target_report)
+    try:
+        text = _clean_text(_opencode_chat(prompt, api_key, model, timeout))
+        if not _looks_readable(text):
+            text = _local_fallback_target_summary(
+                target_report,
+                "OpenCode summary response was not readable, so a deterministic local summary was written.",
+            )
+    except (HttpError, KeyError, IndexError, TypeError) as exc:
+        text = _local_fallback_target_summary(target_report, f"OpenCode summary failed: {exc}")
+    summary_path.write_text(_clean_text(text) + "\n", encoding="utf-8")
+    return summary_path
 
 
 def write_gemini_summary(
