@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .ai_summary import write_nvidia_summary
+from .ai_summary import OPENCODE_DEFAULT_MODEL, write_nvidia_summary, write_opencode_summary
 from .config import AppConfig, load_targets, select_targets
 from .logger import configure_logging, logger
 from .pipeline import Pipeline
@@ -91,6 +91,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--nvidia-model", default="nvidia/nemotron-3-ultra-550b-a55b", help="NVIDIA model name for --nvidia-summary."
+    )
+    parser.add_argument(
+        "--opencode-summary",
+        action="store_true",
+        help="Send the aggregate report to OpenCode Zen (OpenAI-compatible) for a plain-language summary. Uses OPENCODE_API_KEY.",
+    )
+    parser.add_argument(
+        "--opencode-model",
+        default=OPENCODE_DEFAULT_MODEL,
+        help=f"OpenCode Zen model for --opencode-summary (default: {OPENCODE_DEFAULT_MODEL}).",
     )
     parser.add_argument("--log-file", help="Path to log file (default: stderr only).")
     parser.add_argument("--log-json", action="store_true", help="Output logs in JSON format.")
@@ -182,6 +192,17 @@ def main(argv: list[str] | None = None) -> int:
             )
             result["paths"]["nvidia_summary"] = {"text": str(summary_path)}
             logger.info("NVIDIA summary written to %s", summary_path)
+
+    if getattr(args, "opencode_summary", False):
+        api_key = os.environ.get("OPENCODE_API_KEY")
+        if not api_key:
+            logger.warning("--opencode-summary requires OPENCODE_API_KEY in the environment — skipping")
+        else:
+            summary_path = write_opencode_summary(
+                result["aggregate"], Path(app_config.output_dir), api_key, args.opencode_model
+            )
+            result["paths"]["opencode_summary"] = {"text": str(summary_path)}
+            logger.info("OpenCode summary written to %s", summary_path)
 
     aggregate = result["aggregate"]["aggregate"]
     print("OSINT dependency intelligence run complete")

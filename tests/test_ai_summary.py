@@ -8,11 +8,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from osintdepintel.ai_summary import (
+    OPENCODE_DEFAULT_MODEL,
     _clean_text,
     _local_fallback_summary,
     _looks_readable,
     _summary_prompt,
     write_nvidia_summary,
+    write_opencode_summary,
+    write_opencode_target_summary,
 )
 from osintdepintel.http import HttpError
 
@@ -261,3 +264,63 @@ class LiveNvidiaSummaryTests:
             assert result_path.exists()
             content = result_path.read_text(encoding="utf-8")
             assert len(content) > 40
+
+
+class OpenCodeSummaryTests:
+    def test_successful_call_writes_summary_file(self) -> None:
+        mock_http = MagicMock()
+        mock_http.post_json.return_value = {
+            "choices": [{"message": {"content": "The website example.com has 15 dependencies and 4 vulnerabilities."}}]
+        }
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
+        ):
+            result_path = write_opencode_summary(SAMPLE_AGGREGATE, Path(tmp), "test-key")
+            assert result_path.name == "opencode_human_summary.txt"
+            assert "15 dependencies" in result_path.read_text(encoding="utf-8")
+
+    def test_default_model_and_bearer_auth(self) -> None:
+        mock_http = MagicMock()
+        mock_http.post_json.return_value = {
+            "choices": [{"message": {"content": "Valid readable summary content here."}}]
+        }
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
+        ):
+            write_opencode_summary(SAMPLE_AGGREGATE, Path(tmp), "secret-key-999")
+            _, kwargs = mock_http.post_json.call_args
+            assert kwargs["headers"]["Authorization"] == "Bearer secret-key-999"
+            # model defaults to Muse Spark when not overridden
+            payload = mock_http.post_json.call_args.args[1]
+            assert payload["model"] == OPENCODE_DEFAULT_MODEL
+
+    def test_http_error_triggers_fallback(self) -> None:
+        mock_http = MagicMock()
+        mock_http.post_json.side_effect = HttpError("Internal server error")
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
+        ):
+            content = write_opencode_summary(SAMPLE_AGGREGATE, Path(tmp), "test-key").read_text(encoding="utf-8")
+            assert "OpenCode summary failed" in content
+            assert "15 dependencies" in content
+
+    def test_target_summary_writes_stemmed_file(self) -> None:
+        mock_http = MagicMock()
+        mock_http.post_json.return_value = {"choices": [{"message": {"content": "Readable target summary content."}}]}
+        target_report = {
+            "target": {"name": "Example Site", "url": "https://example.test"},
+            "summary": {"dependency_count": 2, "vulnerability_count": 1, "finding_count": 1},
+            "findings": [],
+        }
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
+        ):
+            path = write_opencode_target_summary(
+                target_report, Path(tmp), "k", "muse-spark-1.2-contributor-free", "Example Site"
+            )
+            assert path.name == "example_site_opencode_summary.txt"
+            assert path.exists()

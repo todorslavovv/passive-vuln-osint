@@ -94,6 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
         roGeminiSummaryText: document.getElementById('ro-gemini-summary-text'),
         nvidiaSummarySubtab: document.getElementById('nvidia-summary-subtab'),
         roAiSummaryText: document.getElementById('ro-ai-summary-text'),
+        opencodeSummarySubtab: document.getElementById('opencode-summary-subtab'),
+        roOpencodeSummaryText: document.getElementById('ro-opencode-summary-text'),
         graphResetBtn: document.getElementById('graph-reset-btn'),
         
         // Drawer
@@ -603,6 +605,8 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.nvidiaSummarySubtab.style.display = 'none';
             elements.roGeminiSummaryText.innerHTML = '';
             elements.geminiSummarySubtab.style.display = 'none';
+            if (elements.roOpencodeSummaryText) elements.roOpencodeSummaryText.innerHTML = '';
+            if (elements.opencodeSummarySubtab) elements.opencodeSummarySubtab.style.display = 'none';
 
             // Try to load per-target NVIDIA summary if present
             try {
@@ -622,6 +626,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 // No Gemini summary available
             }
 
+            // Try to load per-target OpenCode (Muse Spark) summary if present
+            try {
+                const opencodeData = await api.get(`/api/reports/opencode-summary/${targetName}`);
+                if (elements.roOpencodeSummaryText) {
+                    elements.roOpencodeSummaryText.innerHTML = formatMarkdown(opencodeData.summary);
+                    elements.opencodeSummarySubtab.style.display = 'block';
+                }
+            } catch {
+                // No OpenCode summary available
+            }
+
             renderAiSummaryFlags();
 
         } catch (err) {
@@ -634,6 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderAiSummaryFlags() {
         const hasNvidia = elements.nvidiaSummarySubtab.style.display !== 'none';
         const hasGemini = elements.geminiSummarySubtab.style.display !== 'none';
+        const hasOpencode = elements.opencodeSummarySubtab && elements.opencodeSummarySubtab.style.display !== 'none';
         elements.aiSummaryFlags.innerHTML = '';
 
         if (hasGemini) {
@@ -650,7 +666,14 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.aiSummaryFlags.appendChild(nvidiaFlag);
         }
 
-        if (!hasGemini && !hasNvidia) {
+        if (hasOpencode) {
+            const opencodeFlag = document.createElement('span');
+            opencodeFlag.className = 'ai-flag ai-flag-blue';
+            opencodeFlag.textContent = 'OpenCode Summary';
+            elements.aiSummaryFlags.appendChild(opencodeFlag);
+        }
+
+        if (!hasGemini && !hasNvidia && !hasOpencode) {
             const noneFlag = document.createElement('span');
             noneFlag.className = 'ai-flag ai-flag-none';
             noneFlag.textContent = 'No AI summary';

@@ -18,8 +18,10 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..ai_summary import (
+    OPENCODE_DEFAULT_MODEL,
     write_gemini_target_summary,
     write_nvidia_target_summary,
+    write_opencode_target_summary,
 )
 from ..config import TargetConfig, load_targets
 from ..logger import logger
@@ -38,8 +40,10 @@ app.add_middleware(
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-CONFIG_PATH_GLOBAL = PROJECT_ROOT / "examples" / "targets.json"
-OUTPUT_DIR_GLOBAL = PROJECT_ROOT / "reports"
+# Config and output locations are env-overridable so the container/Railway deploy can
+# point them at writable, repo-independent paths (a wheel install has no examples/reports).
+CONFIG_PATH_GLOBAL = Path(os.environ.get("OSINT_CONFIG_PATH", PROJECT_ROOT / "examples" / "targets.json"))
+OUTPUT_DIR_GLOBAL = Path(os.environ.get("OSINT_OUTPUT_DIR", PROJECT_ROOT / "reports"))
 
 
 class ScanState:
@@ -253,7 +257,16 @@ def delete_report(target_name: str) -> dict[str, str]:
     safe_stem = _safe_filename(target_name)
     deleted: list[str] = []
     not_found = True
-    suffixes = [".json", ".txt", ".dot", "_cyclonedx.json", "_spdx.json", "_nvidia_summary.txt", "_gemini_summary.txt"]
+    suffixes = [
+        ".json",
+        ".txt",
+        ".dot",
+        "_cyclonedx.json",
+        "_spdx.json",
+        "_nvidia_summary.txt",
+        "_gemini_summary.txt",
+        "_opencode_summary.txt",
+    ]
     for suffix in suffixes:
         path = OUTPUT_DIR_GLOBAL / f"{safe_stem}{suffix}"
         if path.exists():
@@ -293,6 +306,17 @@ def get_gemini_summary(target_name: str) -> dict[str, str]:
     summary_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}_gemini_summary.txt"
     if not summary_file.exists():
         raise HTTPException(status_code=404, detail="Gemini summary file not found")
+    try:
+        return {"summary": summary_file.read_text(encoding="utf-8")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/api/reports/opencode-summary/{target_name}")
+def get_opencode_summary(target_name: str) -> dict[str, str]:
+    summary_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}_opencode_summary.txt"
+    if not summary_file.exists():
+        raise HTTPException(status_code=404, detail="OpenCode summary file not found")
     try:
         return {"summary": summary_file.read_text(encoding="utf-8")}
     except Exception as e:
@@ -352,6 +376,18 @@ def list_report_artifacts(target_name: str) -> list[dict[str, Any]]:
                 "url": f"/api/reports/artifact/{target_name}/gemini-summary",
             }
         )
+    opencode_file = OUTPUT_DIR_GLOBAL / f"{safe_stem}_opencode_summary.txt"
+    if opencode_file.exists():
+        artifacts.append(
+            {
+                "kind": "opencode-summary",
+                "filename": opencode_file.name,
+                "download_name": "opencode-summary.txt",
+                "media_type": "text/plain",
+                "size": opencode_file.stat().st_size,
+                "url": f"/api/reports/artifact/{target_name}/opencode-summary",
+            }
+        )
     return artifacts
 
 
@@ -371,6 +407,7 @@ def download_report_artifact(target_name: str, kind: str) -> FileResponse:
         "spdx": (f"{safe_stem}_spdx.json", "application/json", "sbom.spdx.json"),
         "nvidia-summary": (f"{safe_stem}_nvidia_summary.txt", "text/plain", "nvidia-summary.txt"),
         "gemini-summary": (f"{safe_stem}_gemini_summary.txt", "text/plain", "gemini-summary.txt"),
+        "opencode-summary": (f"{safe_stem}_opencode_summary.txt", "text/plain", "opencode-summary.txt"),
     }
     if kind not in artifact_map:
         raise HTTPException(status_code=400, detail=f"Unknown artifact kind: {kind}")
@@ -415,6 +452,9 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
         skip_nvd = options.get("skip_nvd", False)
         nvidia_summary = options.get("nvidia_summary", False)
         gemini_summary = options.get("gemini_summary", False)
+        # OpenCode summaries run when explicitly requested OR whenever an OPENCODE_API_KEY
+        # is configured in the environment (the Railway deploy path — no UI toggle needed).
+        opencode_summary = options.get("opencode_summary", False) or bool(os.environ.get("OPENCODE_API_KEY"))
         rate_limit = options.get("rate_limit", 4.0)
         max_enrich_dependencies = options.get("max_enrich_dependencies")
 
@@ -454,6 +494,20 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
                     logger.info("Requesting Gemini summary for '%s' using model '%s'...", target_name, gemini_model)
                     write_gemini_target_summary(report, output_dir, gemini_api_key, gemini_model, target_name)
                 logger.info("Gemini summaries complete.")
+
+        if opencode_summary:
+            opencode_api_key = options.get("opencode_api_key") or os.environ.get("OPENCODE_API_KEY")
+            if not opencode_api_key:
+                logger.warning("OpenCode summary requested but no API key was provided")
+            else:
+                opencode_model = options.get("opencode_model") or os.environ.get(
+                    "OPENCODE_MODEL", OPENCODE_DEFAULT_MODEL
+                )
+                for report in result["reports"]:
+                    target_name = report["target"]["name"]
+                    logger.info("Requesting OpenCode summary for '%s' using model '%s'...", target_name, opencode_model)
+                    write_opencode_target_summary(report, output_dir, opencode_api_key, opencode_model, target_name)
+                logger.info("OpenCode summaries complete.")
 
         logger.info("Web scan run completed successfully.")
 
