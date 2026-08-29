@@ -7,25 +7,24 @@ import os
 import queue
 import re
 import threading
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..ai_summary import (
-    write_gemini_summary,
     write_gemini_target_summary,
-    write_nvidia_summary,
     write_nvidia_target_summary,
 )
 from ..config import TargetConfig, load_targets
 from ..logger import logger
 from ..pipeline import Pipeline
+from ..reporting.writers import _safe_filename
 
 app = FastAPI(title="OSINT Dependency Intelligence Dashboard")
 
@@ -72,15 +71,15 @@ def parse_url_to_target(url: str) -> dict[str, Any]:
     url_val = url.strip()
     if not url_val.startswith(("http://", "https://")):
         url_val = "https://" + url_val
-    
+
     try:
         parsed = urlparse(url_val)
         hostname = parsed.hostname or ""
         path = parsed.path.strip("/")
-        
+
         name = ""
         github_repos = []
-        
+
         if "github.com" in hostname.lower():
             # GitHub URL format: github.com/user/repo/...
             parts = [p for p in path.split("/") if p]
@@ -97,19 +96,16 @@ def parse_url_to_target(url: str) -> dict[str, Any]:
         else:
             # Regular website URL format
             parts = [p for p in hostname.split(".") if p]
-            if len(parts) >= 2:
-                if parts[0] == "www":
-                    name = parts[1]
-                else:
-                    name = parts[0]
+            if len(parts) >= 2:  # noqa: SIM108 - nested ternary would hurt readability
+                name = parts[1] if parts[0] == "www" else parts[0]
             else:
                 name = hostname or "web-target"
-                
+
         # Clean target name of unsafe chars
         name = re.sub(r"[^a-zA-Z0-9_-]", "-", name).lower()
         if not name:
             name = "target"
-            
+
         return {
             "name": name,
             "url": url_val,
@@ -118,7 +114,7 @@ def parse_url_to_target(url: str) -> dict[str, Any]:
             "container_images": [],
             "mobile_artifacts": [],
             "package_hints": [],
-            "metadata": {}
+            "metadata": {},
         }
     except Exception as e:
         raise ValueError(f"Failed to parse target URL: {e}") from e
@@ -139,13 +135,13 @@ def add_target(payload: dict[str, Any]) -> dict[str, Any]:
         url = payload.get("url", "").strip()
         if not url:
             raise HTTPException(status_code=400, detail="Target URL is required")
-            
+
         parsed_payload = parse_url_to_target(url)
         targets = load_targets(CONFIG_PATH_GLOBAL)
-        
+
         if any(t.name == parsed_payload["name"] for t in targets):
             raise HTTPException(status_code=400, detail=f"Target '{parsed_payload['name']}' already exists")
-            
+
         new_target = TargetConfig.from_dict(parsed_payload)
         targets.append(new_target)
         save_targets_file(targets)
@@ -162,10 +158,10 @@ def update_target(name: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = payload.get("url", "").strip()
         if not url:
             raise HTTPException(status_code=400, detail="Target URL is required")
-            
+
         parsed_payload = parse_url_to_target(url)
         targets = load_targets(CONFIG_PATH_GLOBAL)
-        
+
         index = -1
         for i, t in enumerate(targets):
             if t.name == name:
@@ -173,7 +169,7 @@ def update_target(name: str, payload: dict[str, Any]) -> dict[str, Any]:
                 break
         if index == -1:
             raise HTTPException(status_code=404, detail=f"Target '{name}' not found")
-            
+
         updated_target = TargetConfig.from_dict(parsed_payload)
         targets[index] = updated_target
         save_targets_file(targets)
@@ -241,7 +237,7 @@ def list_reports() -> list[dict[str, Any]]:
 
 @app.get("/api/reports/detail/{target_name}")
 def get_report_detail(target_name: str) -> dict[str, Any]:
-    report_file = OUTPUT_DIR_GLOBAL / f"{target_name}.json"
+    report_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}.json"
     if not report_file.exists():
         raise HTTPException(status_code=404, detail=f"Report for target '{target_name}' not found")
     try:
@@ -254,7 +250,7 @@ def get_report_detail(target_name: str) -> dict[str, Any]:
 @app.delete("/api/reports/{target_name}")
 def delete_report(target_name: str) -> dict[str, str]:
     """Delete a target report and all of its generated artifacts."""
-    safe_stem = target_name
+    safe_stem = _safe_filename(target_name)
     deleted: list[str] = []
     not_found = True
     suffixes = [".json", ".txt", ".dot", "_cyclonedx.json", "_spdx.json", "_nvidia_summary.txt", "_gemini_summary.txt"]
@@ -283,7 +279,7 @@ def get_aggregate_report() -> dict[str, Any]:
 
 @app.get("/api/reports/nvidia-summary/{target_name}")
 def get_nvidia_summary(target_name: str) -> dict[str, str]:
-    summary_file = OUTPUT_DIR_GLOBAL / f"{target_name}_nvidia_summary.txt"
+    summary_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}_nvidia_summary.txt"
     if not summary_file.exists():
         raise HTTPException(status_code=404, detail="NVIDIA summary file not found")
     try:
@@ -294,7 +290,7 @@ def get_nvidia_summary(target_name: str) -> dict[str, str]:
 
 @app.get("/api/reports/gemini-summary/{target_name}")
 def get_gemini_summary(target_name: str) -> dict[str, str]:
-    summary_file = OUTPUT_DIR_GLOBAL / f"{target_name}_gemini_summary.txt"
+    summary_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}_gemini_summary.txt"
     if not summary_file.exists():
         raise HTTPException(status_code=404, detail="Gemini summary file not found")
     try:
@@ -309,7 +305,7 @@ def list_report_artifacts(target_name: str) -> list[dict[str, Any]]:
     if not OUTPUT_DIR_GLOBAL.exists():
         return []
     # target_name from the report list is already the on-disk file stem.
-    safe_stem = target_name
+    safe_stem = _safe_filename(target_name)
     artifacts: list[dict[str, Any]] = []
     mapping = [
         ("report-json", f"{safe_stem}.json", "application/json", "report.json"),
@@ -366,7 +362,7 @@ def download_report_artifact(target_name: str, kind: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Output directory not found")
 
     # target_name from the report list is already the on-disk file stem.
-    safe_stem = target_name
+    safe_stem = _safe_filename(target_name)
     artifact_map = {
         "report-json": (f"{safe_stem}.json", "application/json", "report.json"),
         "report-text": (f"{safe_stem}.txt", "text/plain", "report.txt"),
@@ -516,7 +512,7 @@ def stream_logs() -> StreamingResponse:
 
 
 @app.middleware("http")
-async def no_cache_static(request, call_next):
+async def no_cache_static(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     # Force revalidation of static assets; otherwise browsers heuristically cache
     # app.js/graph-renderer.js and code fixes never reach an open dashboard tab.
     response = await call_next(request)
@@ -545,10 +541,7 @@ def run_server(host: str, port: int, config_path: str) -> None:
         # Check if the path exists relative to the current working directory first,
         # otherwise resolve it relative to the PROJECT_ROOT.
         cwd_p = p.resolve()
-        if cwd_p.exists():
-            CONFIG_PATH_GLOBAL = cwd_p
-        else:
-            CONFIG_PATH_GLOBAL = (PROJECT_ROOT / p).resolve()
+        CONFIG_PATH_GLOBAL = cwd_p if cwd_p.exists() else (PROJECT_ROOT / p).resolve()
 
     import uvicorn
 

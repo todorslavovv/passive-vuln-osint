@@ -212,3 +212,41 @@ def test_get_nvidia_summary(mock_config_and_output):
 def test_get_nonexistent_nvidia_summary(mock_config_and_output):
     response = client.get("/api/reports/nvidia-summary/test-target")
     assert response.status_code == 404
+
+
+def test_delete_report_removes_all_artifacts(mock_config_and_output):
+    _, temp_output_dir = mock_config_and_output
+
+    for suffix in (".json", ".txt", ".dot", "_cyclonedx.json", "_spdx.json", "_nvidia_summary.txt"):
+        (temp_output_dir / f"test-target{suffix}").write_text("x", encoding="utf-8")
+
+    response = client.delete("/api/reports/test-target")
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    # Every generated artifact for the stem should be gone.
+    assert not any(temp_output_dir.glob("test-target*"))
+
+
+def test_delete_nonexistent_report(mock_config_and_output):
+    response = client.delete("/api/reports/nonexistent")
+    assert response.status_code == 404
+
+
+def test_report_detail_path_traversal_is_neutralized(mock_config_and_output):
+    _, temp_output_dir = mock_config_and_output
+
+    # A secret file one directory above the reports output dir.
+    secret = temp_output_dir.parent / "secret.json"
+    secret.write_text(json.dumps({"target": {}, "summary": {}}), encoding="utf-8")
+
+    # Encoded traversal that, if used verbatim as a stem, would escape the output dir.
+    response = client.get("/api/reports/detail/..%2Fsecret")
+    # The stem is sanitized, so the traversal cannot reach ../secret.json.
+    assert response.status_code == 404
+
+
+def test_download_artifact_unknown_kind(mock_config_and_output):
+    _, temp_output_dir = mock_config_and_output
+    (temp_output_dir / "test-target.json").write_text("{}", encoding="utf-8")
+    response = client.get("/api/reports/artifact/test-target/evil-kind")
+    assert response.status_code == 400
