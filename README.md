@@ -1,5 +1,9 @@
 # OSINT Dependency Vulnerability Intelligence
 
+[![CI](https://github.com/todorslavovv/passive-vuln-osint/actions/workflows/ci.yml/badge.svg)](https://github.com/todorslavovv/passive-vuln-osint/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+
 **Passive OSINT supply-chain dependency vulnerability intelligence CLI and dashboard.** Discovers software dependencies from public web artifacts (HTML, JS bundles, source maps, manifests), resolves versions with evidence chains, correlates known vulnerabilities (OSV, NVD), scores risk, and outputs JSON/text/DOT/SBOM reports. Zero third-party dependencies. 90% test coverage. Designed for offensive security recon and defensive posture assessment — no active scanning required.
 
 ---
@@ -87,6 +91,18 @@ python -m osintdepintel --config examples/targets.json --target juice-shop --out
 
 Live mode may query public target HTML/JS artifacts, configured GitHub raw manifests, configured SBOM URLs, the Wayback Machine CDX API, OSV.dev, and NVD. Missing sources are recorded in the global registry rather than treated as fatal.
 
+### Fail-on severity gate (CI/CD)
+
+Use `--fail-on` to make the CLI exit with a non-zero status when a finding meets or exceeds a severity, so it can block a pipeline on risky dependencies:
+
+```bash
+python -m osintdepintel --config examples/targets.json --all --offline --output-dir reports --fail-on high
+```
+
+- Accepted thresholds: `critical`, `high`, `medium`, `low`.
+- Exit code `3` means the gate tripped (at least one finding at or above the threshold). This is kept distinct from exit code `2` (usage/execution errors) so CI can tell "risky finding" apart from "bad invocation".
+- Reports are still written normally before the process exits; the gate only changes the exit status.
+
 ## Target Modes
 
 Every target is labeled as one of:
@@ -158,6 +174,10 @@ python -m pytest tests
 ```
 
 Tests use fixtures from `tests/fixtures/offline_intel.json` and do not require network access.
+
+## Continuous Integration
+
+Every push and pull request to `main` runs the full quality gate on Python 3.10, 3.11, and 3.12 via GitHub Actions (`.github/workflows/ci.yml`): `ruff check`, `ruff format --check`, `mypy` (strict), and `pytest`. The same gate can be run locally with `make check`.
 
 ## Assumptions and Limitations
 
