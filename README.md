@@ -32,29 +32,25 @@ Then open `http://localhost:8000` in a browser.
 
 - **Dashboard** — overview cards and recent scan activity.
 - **Target Manager** — add, edit, and delete target definitions (URL, GitHub repos, SBOM URLs, package hints, etc.).
-- **Scan Runner** — select a single target via radio button, choose live or offline mode, and optionally generate per-target AI summaries with NVIDIA or Gemini.
-- **Report Explorer** — browse per-target reports, view AI summary flags, download artifacts, and delete reports.
+- **Scan Runner** — select a single target via radio button, choose live or offline mode, and optionally generate a per-target Muse Spark AI summary.
+- **Report Explorer** — browse per-target reports, view the AI summary flag, download artifacts, and delete reports.
 
 ### Per-target AI summaries
 
-The dashboard can generate a separate AI summary for each scanned website:
+The dashboard can generate a plain-language AI summary for each scanned website using **Muse Spark 1.2 (Free)** via **OpenCode Zen** (an OpenAI-compatible gateway). Muse Spark is the only AI provider.
 
-- **NVIDIA** — choose from `nvidia/nemotron-3-ultra-550b-a55b`, `nvidia/llama-3.1-nemotron-70b-instruct`, and `nvidia/mistralai/mixtral-8x22b-instruct-v0.1`.
-- **Gemini** — choose from `gemini-1.5-flash`, `gemini-1.5-flash-8b`, `gemini-1.5-pro`, and `gemini-2.0-flash`.
-- **OpenCode Zen** — an OpenAI-compatible gateway. Defaults to the free `muse-spark-1.2-contributor-free` model; any id from `https://opencode.ai/zen/v1/models` works (e.g. `nemotron-3-ultra-free`).
-
-API keys can be pasted in the UI or set as environment variables:
+The API key can be pasted in the UI or set as an environment variable:
 
 ```powershell
-$env:NVIDIA_API_KEY="your-key"
-$env:GEMINI_API_KEY="your-key"
 $env:OPENCODE_API_KEY="your-key"
-$env:OPENCODE_MODEL="muse-spark-1.2-contributor-free"  # optional override
+$env:OPENCODE_MODEL="muse-spark-1.2-contributor-free"  # optional; this is the default
 ```
 
-When `OPENCODE_API_KEY` is set in the environment, the dashboard generates an OpenCode summary for every scanned target automatically — no UI toggle needed (this is the Railway deployment path). It is also available on the CLI with `--opencode-summary` (and `--opencode-model`).
+When `OPENCODE_API_KEY` is set in the environment, the dashboard generates a Muse Spark summary for every scanned target automatically — no UI toggle needed (this is the Railway deployment path). It is also available on the CLI with `--opencode-summary`.
 
-If no key is provided, the scanner writes a deterministic local-fallback explanation to the per-target summary file so the report remains complete. The same fallback is used if a provider is temporarily unavailable, so a scan never fails because of an AI error.
+`OPENCODE_MODEL` defaults to `muse-spark-1.2-contributor-free`; any id from `https://opencode.ai/zen/v1/models` also works if you need a fallback while Muse Spark is unavailable.
+
+If no key is provided, the scanner writes a deterministic local-fallback explanation to the per-target summary file so the report remains complete. The same fallback is used if the model is temporarily unavailable, so a scan never fails because of an AI error.
 
 ### Report artifacts
 
@@ -65,9 +61,7 @@ For each target, the dashboard and CLI write:
 - `reports/<target>.dot` — Graphviz DOT dependency graph.
 - `reports/<target>_cyclonedx.json` — CycloneDX SBOM.
 - `reports/<target>_spdx.json` — SPDX SBOM.
-- `reports/<target>_nvidia_summary.txt` — per-target NVIDIA AI summary.
-- `reports/<target>_gemini_summary.txt` — per-target Gemini AI summary.
-- `reports/<target>_opencode_summary.txt` — per-target OpenCode (Muse Spark) AI summary.
+- `reports/<target>_opencode_summary.txt` — per-target Muse Spark (OpenCode) AI summary.
 
 It also writes:
 

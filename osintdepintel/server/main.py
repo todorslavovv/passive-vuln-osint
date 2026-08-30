@@ -17,12 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from ..ai_summary import (
-    OPENCODE_DEFAULT_MODEL,
-    write_gemini_target_summary,
-    write_nvidia_target_summary,
-    write_opencode_target_summary,
-)
+from ..ai_summary import OPENCODE_DEFAULT_MODEL, write_opencode_target_summary
 from ..config import TargetConfig, load_targets
 from ..logger import logger
 from ..pipeline import Pipeline
@@ -263,8 +258,6 @@ def delete_report(target_name: str) -> dict[str, str]:
         ".dot",
         "_cyclonedx.json",
         "_spdx.json",
-        "_nvidia_summary.txt",
-        "_gemini_summary.txt",
         "_opencode_summary.txt",
     ]
     for suffix in suffixes:
@@ -286,28 +279,6 @@ def get_aggregate_report() -> dict[str, Any]:
     try:
         with report_file.open("r", encoding="utf-8") as f:
             return cast(dict[str, Any], json.load(f))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@app.get("/api/reports/nvidia-summary/{target_name}")
-def get_nvidia_summary(target_name: str) -> dict[str, str]:
-    summary_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}_nvidia_summary.txt"
-    if not summary_file.exists():
-        raise HTTPException(status_code=404, detail="NVIDIA summary file not found")
-    try:
-        return {"summary": summary_file.read_text(encoding="utf-8")}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@app.get("/api/reports/gemini-summary/{target_name}")
-def get_gemini_summary(target_name: str) -> dict[str, str]:
-    summary_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}_gemini_summary.txt"
-    if not summary_file.exists():
-        raise HTTPException(status_code=404, detail="Gemini summary file not found")
-    try:
-        return {"summary": summary_file.read_text(encoding="utf-8")}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -352,30 +323,6 @@ def list_report_artifacts(target_name: str) -> list[dict[str, Any]]:
                 }
             )
     # Per-target AI summaries are exposed as downloads for this report stem.
-    nvidia_file = OUTPUT_DIR_GLOBAL / f"{safe_stem}_nvidia_summary.txt"
-    if nvidia_file.exists():
-        artifacts.append(
-            {
-                "kind": "nvidia-summary",
-                "filename": nvidia_file.name,
-                "download_name": "nvidia-summary.txt",
-                "media_type": "text/plain",
-                "size": nvidia_file.stat().st_size,
-                "url": f"/api/reports/artifact/{target_name}/nvidia-summary",
-            }
-        )
-    gemini_file = OUTPUT_DIR_GLOBAL / f"{safe_stem}_gemini_summary.txt"
-    if gemini_file.exists():
-        artifacts.append(
-            {
-                "kind": "gemini-summary",
-                "filename": gemini_file.name,
-                "download_name": "gemini-summary.txt",
-                "media_type": "text/plain",
-                "size": gemini_file.stat().st_size,
-                "url": f"/api/reports/artifact/{target_name}/gemini-summary",
-            }
-        )
     opencode_file = OUTPUT_DIR_GLOBAL / f"{safe_stem}_opencode_summary.txt"
     if opencode_file.exists():
         artifacts.append(
@@ -405,8 +352,6 @@ def download_report_artifact(target_name: str, kind: str) -> FileResponse:
         "graph-dot": (f"{safe_stem}.dot", "text/plain", "graph.dot"),
         "cyclonedx": (f"{safe_stem}_cyclonedx.json", "application/json", "sbom.cyclonedx.json"),
         "spdx": (f"{safe_stem}_spdx.json", "application/json", "sbom.spdx.json"),
-        "nvidia-summary": (f"{safe_stem}_nvidia_summary.txt", "text/plain", "nvidia-summary.txt"),
-        "gemini-summary": (f"{safe_stem}_gemini_summary.txt", "text/plain", "gemini-summary.txt"),
         "opencode-summary": (f"{safe_stem}_opencode_summary.txt", "text/plain", "opencode-summary.txt"),
     }
     if kind not in artifact_map:
@@ -450,10 +395,8 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
 
         offline = options.get("offline", False)
         skip_nvd = options.get("skip_nvd", False)
-        nvidia_summary = options.get("nvidia_summary", False)
-        gemini_summary = options.get("gemini_summary", False)
-        # OpenCode summaries run when explicitly requested OR whenever an OPENCODE_API_KEY
-        # is configured in the environment (the Railway deploy path — no UI toggle needed).
+        # OpenCode (Muse Spark) summaries run when explicitly requested OR whenever an
+        # OPENCODE_API_KEY is configured in the environment (the deploy path — no UI toggle).
         opencode_summary = options.get("opencode_summary", False) or bool(os.environ.get("OPENCODE_API_KEY"))
         rate_limit = options.get("rate_limit", 4.0)
         max_enrich_dependencies = options.get("max_enrich_dependencies")
@@ -470,31 +413,8 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
 
         result = pipeline.process_targets(selected_targets, output_dir=output_dir, include_graph=True)
 
-        # AI summaries are generated per-target so each website report has its own explanation.
-        if nvidia_summary:
-            nvidia_api_key = options.get("nvidia_api_key") or os.environ.get("NVIDIA_API_KEY")
-            if not nvidia_api_key:
-                logger.warning("NVIDIA summary requested but no API key was provided")
-            else:
-                nvidia_model = options.get("nvidia_model", "nvidia/nemotron-3-ultra-550b-a55b")
-                for report in result["reports"]:
-                    target_name = report["target"]["name"]
-                    logger.info("Requesting NVIDIA summary for '%s' using model '%s'...", target_name, nvidia_model)
-                    write_nvidia_target_summary(report, output_dir, nvidia_api_key, nvidia_model, target_name)
-                logger.info("NVIDIA summaries complete.")
-
-        if gemini_summary:
-            gemini_api_key = options.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
-            if not gemini_api_key:
-                logger.warning("Gemini summary requested but no API key was provided")
-            else:
-                gemini_model = options.get("gemini_model", "gemini-1.5-flash")
-                for report in result["reports"]:
-                    target_name = report["target"]["name"]
-                    logger.info("Requesting Gemini summary for '%s' using model '%s'...", target_name, gemini_model)
-                    write_gemini_target_summary(report, output_dir, gemini_api_key, gemini_model, target_name)
-                logger.info("Gemini summaries complete.")
-
+        # A per-target OpenCode (Muse Spark) summary is written so each website report
+        # has its own plain-language explanation.
         if opencode_summary:
             opencode_api_key = options.get("opencode_api_key") or os.environ.get("OPENCODE_API_KEY")
             if not opencode_api_key:
