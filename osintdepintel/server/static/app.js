@@ -43,9 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scannerTargetsContainer: document.getElementById('scanner-targets-container'),
         scanOptOffline: document.getElementById('scan-opt-offline'),
         scanOptSkipNvd: document.getElementById('scan-opt-skip-nvd'),
-        scanOptOpencodeSummary: document.getElementById('scan-opt-opencode-summary'),
-        opencodeOptionsGroup: document.getElementById('opencode-options-group'),
-        scanOptOpencodeApiKey: document.getElementById('scan-opt-opencode-api-key'),
         scanOptRateLimit: document.getElementById('scan-opt-rate-limit'),
         rateLimitVal: document.getElementById('rate-limit-val'),
         scanOptMaxDeps: document.getElementById('scan-opt-max-deps'),
@@ -397,10 +394,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    elements.scanOptOpencodeSummary.addEventListener('change', () => {
-        elements.opencodeOptionsGroup.style.display = elements.scanOptOpencodeSummary.checked ? 'block' : 'none';
-    });
-
     elements.scanOptRateLimit.addEventListener('input', () => {
         elements.rateLimitVal.textContent = parseFloat(elements.scanOptRateLimit.value).toFixed(1);
     });
@@ -419,8 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const options = {
             offline: elements.scanOptOffline.checked,
             skip_nvd: elements.scanOptSkipNvd.checked,
-            opencode_summary: elements.scanOptOpencodeSummary.checked,
-            opencode_api_key: elements.scanOptOpencodeApiKey.value.trim() || null,
             rate_limit: parseFloat(elements.scanOptRateLimit.value),
             max_enrich_dependencies: elements.scanOptMaxDeps.value ? parseInt(elements.scanOptMaxDeps.value) : null
         };
