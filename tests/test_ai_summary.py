@@ -179,7 +179,7 @@ class OpenCodeSummaryTests:
             write_opencode_summary(SAMPLE_AGGREGATE, Path(tmp), "secret-key-999")
             _, kwargs = mock_http.post_json.call_args
             assert kwargs["headers"]["Authorization"] == "Bearer secret-key-999"
-            # model defaults to Muse Spark when not overridden
+            # model defaults to OPENCODE_DEFAULT_MODEL when not overridden
             payload = mock_http.post_json.call_args.args[1]
             assert payload["model"] == OPENCODE_DEFAULT_MODEL
 
@@ -206,8 +206,6 @@ class OpenCodeSummaryTests:
             tempfile.TemporaryDirectory() as tmp,
             patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
         ):
-            path = write_opencode_target_summary(
-                target_report, Path(tmp), "k", "muse-spark-1.2-contributor-free", "Example Site"
-            )
+            path = write_opencode_target_summary(target_report, Path(tmp), "k", "laguna-s-2.1-free", "Example Site")
             assert path.name == "example_site_opencode_summary.txt"
             assert path.exists()

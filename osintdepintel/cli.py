@@ -88,8 +88,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--opencode-summary",
         action="store_true",
         help=(
-            "Generate a plain-language AI summary via OpenCode Zen (Muse Spark). "
-            "Uses OPENCODE_API_KEY; model is OPENCODE_MODEL or the Muse Spark default."
+            "Generate a plain-language AI summary via OpenCode Zen. "
+            "Uses OPENCODE_API_KEY; model is OPENCODE_MODEL or the default."
         ),
     )
     parser.add_argument("--log-file", help="Path to log file (default: stderr only).")

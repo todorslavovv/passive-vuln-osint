@@ -32,23 +32,23 @@ Then open `http://localhost:8000` in a browser.
 
 - **Dashboard** — overview cards and recent scan activity.
 - **Target Manager** — add, edit, and delete target definitions (URL, GitHub repos, SBOM URLs, package hints, etc.).
-- **Scan Runner** — select a single target via radio button, choose live or offline mode, and optionally generate a per-target Muse Spark AI summary.
+- **Scan Runner** — select a single target via radio button and choose live or offline mode. A per-target AI summary is generated automatically when the server has an OpenCode key.
 - **Report Explorer** — browse per-target reports, view the AI summary flag, download artifacts, and delete reports.
 
 ### Per-target AI summaries
 
-The dashboard can generate a plain-language AI summary for each scanned website using **Muse Spark 1.2 (Free)** via **OpenCode Zen** (an OpenAI-compatible gateway). Muse Spark is the only AI provider.
+The dashboard can generate a plain-language AI summary for each scanned website using **OpenCode Zen** (an OpenAI-compatible gateway). The default model is `laguna-s-2.1-free`.
 
-The API key can be pasted in the UI or set as an environment variable:
+The API key is set as an environment variable:
 
 ```powershell
 $env:OPENCODE_API_KEY="your-key"
-$env:OPENCODE_MODEL="muse-spark-1.2-contributor-free"  # optional; this is the default
+$env:OPENCODE_MODEL="laguna-s-2.1-free"  # optional; this is the default
 ```
 
-When `OPENCODE_API_KEY` is set in the environment, the dashboard generates a Muse Spark summary for every scanned target automatically — no UI toggle needed (this is the Railway deployment path). It is also available on the CLI with `--opencode-summary`.
+When `OPENCODE_API_KEY` is set in the environment, the dashboard generates an AI summary for every scanned target automatically — no UI toggle or per-visitor setup needed (this is the Railway deployment path). It is also available on the CLI with `--opencode-summary`.
 
-`OPENCODE_MODEL` defaults to `muse-spark-1.2-contributor-free`; any id from `https://opencode.ai/zen/v1/models` also works if you need a fallback while Muse Spark is unavailable.
+`OPENCODE_MODEL` defaults to `laguna-s-2.1-free`; any id from `https://opencode.ai/zen/v1/models` works. (Note: the Muse Spark free tier `muse-spark-1.2-contributor-free` returns HTTP 500 for raw API keys — it requires the interactive OpenCode CLI contributor opt-in and is not usable from a server.)
 
 If no key is provided, the scanner writes a deterministic local-fallback explanation to the per-target summary file so the report remains complete. The same fallback is used if the model is temporarily unavailable, so a scan never fails because of an AI error.
 
@@ -61,7 +61,7 @@ For each target, the dashboard and CLI write:
 - `reports/<target>.dot` — Graphviz DOT dependency graph.
 - `reports/<target>_cyclonedx.json` — CycloneDX SBOM.
 - `reports/<target>_spdx.json` — SPDX SBOM.
-- `reports/<target>_opencode_summary.txt` — per-target Muse Spark (OpenCode) AI summary.
+- `reports/<target>_opencode_summary.txt` — per-target OpenCode AI summary.
 
 It also writes:
 
@@ -79,7 +79,7 @@ The repo ships a container image and Railway config for the web dashboard:
 Steps:
 
 1. Create a new Railway project from this GitHub repo (Railway auto-detects `railway.json`).
-2. In the service **Variables**, add `OPENCODE_API_KEY` (and optionally `OPENCODE_MODEL`, default `muse-spark-1.2-contributor-free`). With the key set, every scan gets an OpenCode summary automatically.
+2. In the service **Variables**, add `OPENCODE_API_KEY` (and optionally `OPENCODE_MODEL`, default `laguna-s-2.1-free`). With the key set, every scan gets an AI summary automatically.
 3. Deploy. Railway assigns a public URL; the container serves the dashboard on `$PORT`.
 
 The container reads its config from `OSINT_CONFIG_PATH` and writes reports to `OSINT_OUTPUT_DIR` (both preset in the image). Railway's filesystem is ephemeral — attach a volume at the output dir if you want reports to persist across restarts.

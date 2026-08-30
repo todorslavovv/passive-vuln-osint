@@ -10,7 +10,10 @@ from .reporting.writers import _safe_filename
 
 # OpenCode Zen is an OpenAI-compatible chat-completions gateway (Bearer auth).
 OPENCODE_BASE_URL = "https://opencode.ai/zen/v1/chat/completions"
-OPENCODE_DEFAULT_MODEL = "muse-spark-1.2-contributor-free"
+# laguna-s-2.1-free is fast, non-reasoning, and returns clean content reliably via
+# API key. (muse-spark-1.2-contributor-free 500s for raw API keys — it needs the
+# interactive OpenCode CLI contributor opt-in, not available to a server.)
+OPENCODE_DEFAULT_MODEL = "laguna-s-2.1-free"
 
 _OPENCODE_SYSTEM = (
     "You explain passive OSINT dependency intelligence reports in simple human language. "
