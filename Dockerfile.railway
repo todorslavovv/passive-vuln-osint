@@ -21,10 +21,10 @@ USER osint
 
 # Config/output are env-overridable (see server/main.py). OPENCODE_API_KEY is set
 # in the Railway dashboard, not baked into the image; when present, every scan
-# gets an OpenCode (Muse Spark) summary automatically.
+# gets an OpenCode AI summary automatically.
 ENV OSINT_CONFIG_PATH=/app/examples/targets.json \
     OSINT_OUTPUT_DIR=/app/reports \
-    OPENCODE_MODEL=muse-spark-1.2-contributor-free
+    OPENCODE_MODEL=laguna-s-2.1-free
 
 EXPOSE 8000
 CMD ["sh", "-c", "python -m osintdepintel --server --host 0.0.0.0 --port ${PORT:-8000} --config ${OSINT_CONFIG_PATH}"]

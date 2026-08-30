@@ -395,7 +395,7 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
 
         offline = options.get("offline", False)
         skip_nvd = options.get("skip_nvd", False)
-        # OpenCode (Muse Spark) summaries run when explicitly requested OR whenever an
+        # OpenCode AI summaries run when explicitly requested OR whenever an
         # OPENCODE_API_KEY is configured in the environment (the deploy path — no UI toggle).
         opencode_summary = options.get("opencode_summary", False) or bool(os.environ.get("OPENCODE_API_KEY"))
         rate_limit = options.get("rate_limit", 4.0)
@@ -413,7 +413,7 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
 
         result = pipeline.process_targets(selected_targets, output_dir=output_dir, include_graph=True)
 
-        # A per-target OpenCode (Muse Spark) summary is written so each website report
+        # A per-target OpenCode AI summary is written so each website report
         # has its own plain-language explanation.
         if opencode_summary:
             opencode_api_key = options.get("opencode_api_key") or os.environ.get("OPENCODE_API_KEY")

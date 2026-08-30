@@ -578,7 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (elements.roOpencodeSummaryText) elements.roOpencodeSummaryText.innerHTML = '';
             if (elements.opencodeSummarySubtab) elements.opencodeSummarySubtab.style.display = 'none';
 
-            // Try to load per-target Muse Spark (OpenCode) summary if present
+            // Try to load per-target AI (OpenCode) summary if present
             try {
                 const opencodeData = await api.get(`/api/reports/opencode-summary/${targetName}`);
                 if (elements.roOpencodeSummaryText) {
@@ -605,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hasOpencode) {
             const opencodeFlag = document.createElement('span');
             opencodeFlag.className = 'ai-flag ai-flag-blue';
-            opencodeFlag.textContent = 'Muse Spark Summary';
+            opencodeFlag.textContent = 'AI Summary';
             elements.aiSummaryFlags.appendChild(opencodeFlag);
         }
 
@@ -654,7 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'graph-dot': 'Graph DOT',
             'cyclonedx': 'CycloneDX SBOM',
             'spdx': 'SPDX SBOM',
-            'opencode-summary': 'Muse Spark Summary'
+            'opencode-summary': 'AI Summary'
         };
         return labels[kind] || kind;
     }
