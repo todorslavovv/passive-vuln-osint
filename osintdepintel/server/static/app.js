@@ -43,14 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
         scannerTargetsContainer: document.getElementById('scanner-targets-container'),
         scanOptOffline: document.getElementById('scan-opt-offline'),
         scanOptSkipNvd: document.getElementById('scan-opt-skip-nvd'),
-        scanOptNvidiaSummary: document.getElementById('scan-opt-nvidia-summary'),
-        nvidiaOptionsGroup: document.getElementById('nvidia-options-group'),
-        scanOptNvidiaModel: document.getElementById('scan-opt-nvidia-model'),
-        scanOptNvidiaApiKey: document.getElementById('scan-opt-nvidia-api-key'),
-        scanOptGeminiSummary: document.getElementById('scan-opt-gemini-summary'),
-        geminiOptionsGroup: document.getElementById('gemini-options-group'),
-        scanOptGeminiModel: document.getElementById('scan-opt-gemini-model'),
-        scanOptGeminiApiKey: document.getElementById('scan-opt-gemini-api-key'),
+        scanOptOpencodeSummary: document.getElementById('scan-opt-opencode-summary'),
+        opencodeOptionsGroup: document.getElementById('opencode-options-group'),
+        scanOptOpencodeApiKey: document.getElementById('scan-opt-opencode-api-key'),
         scanOptRateLimit: document.getElementById('scan-opt-rate-limit'),
         rateLimitVal: document.getElementById('rate-limit-val'),
         scanOptMaxDeps: document.getElementById('scan-opt-max-deps'),
@@ -90,10 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Subtabs
         subTabBtns: document.querySelectorAll('.sub-tab-btn'),
         subTabPanes: document.querySelectorAll('.sub-tab-pane'),
-        geminiSummarySubtab: document.getElementById('gemini-summary-subtab'),
-        roGeminiSummaryText: document.getElementById('ro-gemini-summary-text'),
-        nvidiaSummarySubtab: document.getElementById('nvidia-summary-subtab'),
-        roAiSummaryText: document.getElementById('ro-ai-summary-text'),
         opencodeSummarySubtab: document.getElementById('opencode-summary-subtab'),
         roOpencodeSummaryText: document.getElementById('ro-opencode-summary-text'),
         graphResetBtn: document.getElementById('graph-reset-btn'),
@@ -406,12 +397,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    elements.scanOptNvidiaSummary.addEventListener('change', () => {
-        elements.nvidiaOptionsGroup.style.display = elements.scanOptNvidiaSummary.checked ? 'block' : 'none';
-    });
-
-    elements.scanOptGeminiSummary.addEventListener('change', () => {
-        elements.geminiOptionsGroup.style.display = elements.scanOptGeminiSummary.checked ? 'block' : 'none';
+    elements.scanOptOpencodeSummary.addEventListener('change', () => {
+        elements.opencodeOptionsGroup.style.display = elements.scanOptOpencodeSummary.checked ? 'block' : 'none';
     });
 
     elements.scanOptRateLimit.addEventListener('input', () => {
@@ -432,12 +419,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const options = {
             offline: elements.scanOptOffline.checked,
             skip_nvd: elements.scanOptSkipNvd.checked,
-            nvidia_summary: elements.scanOptNvidiaSummary.checked,
-            nvidia_model: elements.scanOptNvidiaModel.value,
-            nvidia_api_key: elements.scanOptNvidiaApiKey.value.trim() || null,
-            gemini_summary: elements.scanOptGeminiSummary.checked,
-            gemini_model: elements.scanOptGeminiModel.value,
-            gemini_api_key: elements.scanOptGeminiApiKey.value.trim() || null,
+            opencode_summary: elements.scanOptOpencodeSummary.checked,
+            opencode_api_key: elements.scanOptOpencodeApiKey.value.trim() || null,
             rate_limit: parseFloat(elements.scanOptRateLimit.value),
             max_enrich_dependencies: elements.scanOptMaxDeps.value ? parseInt(elements.scanOptMaxDeps.value) : null
         };
@@ -600,33 +583,11 @@ document.addEventListener('DOMContentLoaded', () => {
             state.activeReportFilename = targetName;
             renderActiveReport();
 
-            // Reset AI summary subtabs
-            elements.roAiSummaryText.innerHTML = '';
-            elements.nvidiaSummarySubtab.style.display = 'none';
-            elements.roGeminiSummaryText.innerHTML = '';
-            elements.geminiSummarySubtab.style.display = 'none';
+            // Reset AI summary subtab
             if (elements.roOpencodeSummaryText) elements.roOpencodeSummaryText.innerHTML = '';
             if (elements.opencodeSummarySubtab) elements.opencodeSummarySubtab.style.display = 'none';
 
-            // Try to load per-target NVIDIA summary if present
-            try {
-                const nvidiaData = await api.get(`/api/reports/nvidia-summary/${targetName}`);
-                elements.roAiSummaryText.innerHTML = formatMarkdown(nvidiaData.summary);
-                elements.nvidiaSummarySubtab.style.display = 'block';
-            } catch {
-                // No NVIDIA summary available
-            }
-
-            // Try to load per-target Gemini summary if present
-            try {
-                const geminiData = await api.get(`/api/reports/gemini-summary/${targetName}`);
-                elements.roGeminiSummaryText.innerHTML = formatMarkdown(geminiData.summary);
-                elements.geminiSummarySubtab.style.display = 'block';
-            } catch {
-                // No Gemini summary available
-            }
-
-            // Try to load per-target OpenCode (Muse Spark) summary if present
+            // Try to load per-target Muse Spark (OpenCode) summary if present
             try {
                 const opencodeData = await api.get(`/api/reports/opencode-summary/${targetName}`);
                 if (elements.roOpencodeSummaryText) {
@@ -647,33 +608,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAiSummaryFlags() {
-        const hasNvidia = elements.nvidiaSummarySubtab.style.display !== 'none';
-        const hasGemini = elements.geminiSummarySubtab.style.display !== 'none';
         const hasOpencode = elements.opencodeSummarySubtab && elements.opencodeSummarySubtab.style.display !== 'none';
         elements.aiSummaryFlags.innerHTML = '';
-
-        if (hasGemini) {
-            const geminiFlag = document.createElement('span');
-            geminiFlag.className = 'ai-flag ai-flag-blue';
-            geminiFlag.textContent = 'Gemini Summary';
-            elements.aiSummaryFlags.appendChild(geminiFlag);
-        }
-
-        if (hasNvidia) {
-            const nvidiaFlag = document.createElement('span');
-            nvidiaFlag.className = 'ai-flag ai-flag-green';
-            nvidiaFlag.textContent = 'NVIDIA Summary';
-            elements.aiSummaryFlags.appendChild(nvidiaFlag);
-        }
 
         if (hasOpencode) {
             const opencodeFlag = document.createElement('span');
             opencodeFlag.className = 'ai-flag ai-flag-blue';
-            opencodeFlag.textContent = 'OpenCode Summary';
+            opencodeFlag.textContent = 'Muse Spark Summary';
             elements.aiSummaryFlags.appendChild(opencodeFlag);
         }
 
-        if (!hasGemini && !hasNvidia && !hasOpencode) {
+        if (!hasOpencode) {
             const noneFlag = document.createElement('span');
             noneFlag.className = 'ai-flag ai-flag-none';
             noneFlag.textContent = 'No AI summary';
@@ -718,8 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'graph-dot': 'Graph DOT',
             'cyclonedx': 'CycloneDX SBOM',
             'spdx': 'SPDX SBOM',
-            'nvidia-summary': 'NVIDIA Summary',
-            'gemini-summary': 'Gemini Summary'
+            'opencode-summary': 'Muse Spark Summary'
         };
         return labels[kind] || kind;
     }

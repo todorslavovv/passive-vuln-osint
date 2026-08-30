@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from osintdepintel.ai_summary import (
     OPENCODE_DEFAULT_MODEL,
@@ -13,7 +10,6 @@ from osintdepintel.ai_summary import (
     _local_fallback_summary,
     _looks_readable,
     _summary_prompt,
-    write_nvidia_summary,
     write_opencode_summary,
     write_opencode_target_summary,
 )
@@ -128,14 +124,14 @@ class SummaryPromptTests:
 
 class LocalFallbackSummaryTests:
     def test_with_warning(self) -> None:
-        result = _local_fallback_summary(SAMPLE_AGGREGATE, "NVIDIA API error")
-        assert "NVIDIA API error" in result
+        result = _local_fallback_summary(SAMPLE_AGGREGATE, "OpenCode API error")
+        assert "OpenCode API error" in result
         assert "2 websites" in result
         assert "15 dependencies" in result
 
     def test_without_warning(self) -> None:
         result = _local_fallback_summary(SAMPLE_AGGREGATE)
-        assert "NVIDIA" not in result
+        assert "API error" not in result
         assert "Processed 2 websites" in result
 
     def test_includes_target_details(self) -> None:
@@ -155,115 +151,6 @@ class LocalFallbackSummaryTests:
         result = _local_fallback_summary(SAMPLE_AGGREGATE_NO_EXPLOIT)
         assert "none found" in result
         assert "CVE-2025-0001" in result
-
-
-class NvidiaSummaryTests:
-    def test_successful_call_writes_summary_file(self) -> None:
-        mock_http = MagicMock()
-        mock_http.post_json.return_value = {
-            "choices": [{"message": {"content": "The website example.com has 15 dependencies and 4 vulnerabilities."}}]
-        }
-        with (
-            tempfile.TemporaryDirectory() as tmp,
-            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
-        ):
-            output_dir = Path(tmp)
-            result_path = write_nvidia_summary(SAMPLE_AGGREGATE, output_dir, "test-key", "test-model")
-            assert result_path.exists()
-            content = result_path.read_text(encoding="utf-8")
-            assert "15 dependencies" in content
-
-    def test_http_error_triggers_fallback(self) -> None:
-        mock_http = MagicMock()
-        mock_http.post_json.side_effect = HttpError("API unreachable")
-        with (
-            tempfile.TemporaryDirectory() as tmp,
-            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
-        ):
-            output_dir = Path(tmp)
-            result_path = write_nvidia_summary(SAMPLE_AGGREGATE, output_dir, "test-key", "test-model")
-            content = result_path.read_text(encoding="utf-8")
-            assert "API unreachable" in content
-            assert "15 dependencies" in content
-
-    def test_bad_response_format_triggers_fallback(self) -> None:
-        mock_http = MagicMock()
-        mock_http.post_json.return_value = {"unexpected": "response"}
-        with (
-            tempfile.TemporaryDirectory() as tmp,
-            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
-        ):
-            output_dir = Path(tmp)
-            result_path = write_nvidia_summary(SAMPLE_AGGREGATE, output_dir, "test-key", "test-model")
-            content = result_path.read_text(encoding="utf-8")
-            assert "NVIDIA summary failed" in content
-
-    def test_unreadable_response_triggers_local_fallback(self) -> None:
-        mock_http = MagicMock()
-        mock_http.post_json.return_value = {"choices": [{"message": {"content": "short"}}]}
-        with (
-            tempfile.TemporaryDirectory() as tmp,
-            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
-        ):
-            output_dir = Path(tmp)
-            result_path = write_nvidia_summary(SAMPLE_AGGREGATE, output_dir, "test-key", "test-model")
-            content = result_path.read_text(encoding="utf-8")
-            assert "not readable" in content
-
-    def test_creates_output_directory_recursively(self) -> None:
-        mock_http = MagicMock()
-        mock_http.post_json.return_value = {
-            "choices": [{"message": {"content": "The website example.com has 15 dependencies."}}]
-        }
-        with (
-            tempfile.TemporaryDirectory() as tmp,
-            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
-        ):
-            nested_dir = Path(tmp) / "deep" / "nested"
-            result_path = write_nvidia_summary(SAMPLE_AGGREGATE, nested_dir, "test-key", "test-model")
-            assert result_path.exists()
-
-    def test_passes_model_name_to_api(self) -> None:
-        mock_http = MagicMock()
-        mock_http.post_json.return_value = {"choices": [{"message": {"content": "Valid summary content here."}}]}
-        with (
-            tempfile.TemporaryDirectory() as tmp,
-            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
-        ):
-            output_dir = Path(tmp)
-            write_nvidia_summary(SAMPLE_AGGREGATE, output_dir, "test-key", "nemotron-3-ultra")
-            args, kwargs = mock_http.post_json.call_args
-            payload = args[1]
-            assert payload["model"] == "nemotron-3-ultra"
-
-    def test_sends_authorization_header(self) -> None:
-        mock_http = MagicMock()
-        mock_http.post_json.return_value = {"choices": [{"message": {"content": "Valid summary content here."}}]}
-        with (
-            tempfile.TemporaryDirectory() as tmp,
-            patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
-        ):
-            output_dir = Path(tmp)
-            write_nvidia_summary(SAMPLE_AGGREGATE, output_dir, "secret-key-12345", "test-model")
-            args, kwargs = mock_http.post_json.call_args
-            headers = kwargs.get("headers")
-            assert headers is not None
-            assert headers["Authorization"] == "Bearer secret-key-12345"
-
-
-@pytest.mark.live
-class LiveNvidiaSummaryTests:
-    def test_live_api_call(self) -> None:
-        api_key = os.environ.get("NVIDIA_API_KEY")
-        if not api_key:
-            pytest.skip("NVIDIA_API_KEY not set")
-        with tempfile.TemporaryDirectory() as tmp:
-            output_dir = Path(tmp)
-            model = os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")
-            result_path = write_nvidia_summary(SAMPLE_AGGREGATE, output_dir, api_key, model)
-            assert result_path.exists()
-            content = result_path.read_text(encoding="utf-8")
-            assert len(content) > 40
 
 
 class OpenCodeSummaryTests:

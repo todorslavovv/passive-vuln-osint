@@ -196,26 +196,6 @@ class BuildParserTests:
                     main()
                 assert exc.value.code == 2
 
-    def test_nvidia_summary_without_api_key_skips(self) -> None:
-        mock_pipeline = MagicMock()
-        mock_pipeline.process_targets.return_value = dict(_BUILDER_RESULT)
-        with (
-            patch.dict(os.environ, {}, clear=True),
-            patch("osintdepintel.cli.Pipeline", return_value=mock_pipeline),
-            patch(
-                "osintdepintel.cli.sys.argv",
-                [
-                    "osintdepintel",
-                    "--config",
-                    str(Path(__file__).parent.parent / "examples" / "targets.json"),
-                    "--all",
-                    "--nvidia-summary",
-                ],
-            ),
-        ):
-            ret = main()
-            assert ret == 0
-
     def test_opencode_summary_without_api_key_skips(self) -> None:
         mock_pipeline = MagicMock()
         mock_pipeline.process_targets.return_value = dict(_BUILDER_RESULT)

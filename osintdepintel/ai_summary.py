@@ -8,8 +8,6 @@ from typing import Any
 from .http import HttpClient, HttpError
 from .reporting.writers import _safe_filename
 
-NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 # OpenCode Zen is an OpenAI-compatible chat-completions gateway (Bearer auth).
 OPENCODE_BASE_URL = "https://opencode.ai/zen/v1/chat/completions"
 OPENCODE_DEFAULT_MODEL = "muse-spark-1.2-contributor-free"
@@ -93,139 +91,6 @@ def write_opencode_target_summary(
     return summary_path
 
 
-def write_gemini_summary(
-    aggregate_report: dict[str, Any],
-    output_dir: Path,
-    api_key: str,
-    model: str,
-    timeout: int = 120,
-) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    summary_path = output_dir / "gemini_human_summary.txt"
-    prompt = _summary_prompt(aggregate_report)
-    url = f"{GEMINI_BASE_URL.format(model=model)}?key={api_key}"
-    client = HttpClient(timeout=timeout)
-    try:
-        response = client.post_json(
-            url,
-            {
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [{"text": prompt}],
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.2,
-                    "topP": 0.95,
-                    "maxOutputTokens": 8192,
-                },
-            },
-        )
-        text = response["candidates"][0]["content"]["parts"][0]["text"].strip()
-        text = _clean_text(text)
-        if not _looks_readable(text):
-            text = _local_fallback_summary(
-                aggregate_report,
-                "Gemini summary response was not readable, so a deterministic local summary was written.",
-            )
-    except (HttpError, KeyError, IndexError, TypeError) as exc:
-        text = _local_fallback_summary(aggregate_report, f"Gemini summary failed: {exc}")
-    summary_path.write_text(_clean_text(text) + "\n", encoding="utf-8")
-    return summary_path
-
-
-def write_gemini_target_summary(
-    target_report: dict[str, Any],
-    output_dir: Path,
-    api_key: str,
-    model: str,
-    target_name: str,
-    timeout: int = 120,
-) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    safe_stem = _safe_filename(target_name)
-    summary_path = output_dir / f"{safe_stem}_gemini_summary.txt"
-    prompt = _target_summary_prompt(target_report)
-    url = f"{GEMINI_BASE_URL.format(model=model)}?key={api_key}"
-    client = HttpClient(timeout=timeout)
-    try:
-        response = client.post_json(
-            url,
-            {
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [{"text": prompt}],
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.2,
-                    "topP": 0.95,
-                    "maxOutputTokens": 8192,
-                },
-            },
-        )
-        text = response["candidates"][0]["content"]["parts"][0]["text"].strip()
-        text = _clean_text(text)
-        if not _looks_readable(text):
-            text = _local_fallback_target_summary(
-                target_report,
-                "Gemini summary response was not readable, so a deterministic local summary was written.",
-            )
-    except (HttpError, KeyError, IndexError, TypeError) as exc:
-        text = _local_fallback_target_summary(target_report, f"Gemini summary failed: {exc}")
-    summary_path.write_text(_clean_text(text) + "\n", encoding="utf-8")
-    return summary_path
-
-
-def write_nvidia_summary(
-    aggregate_report: dict[str, Any],
-    output_dir: Path,
-    api_key: str,
-    model: str,
-    timeout: int = 120,
-) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    summary_path = output_dir / "nvidia_human_summary.txt"
-    prompt = _summary_prompt(aggregate_report)
-    client = HttpClient(timeout=timeout)
-    try:
-        response = client.post_json(
-            NVIDIA_BASE_URL,
-            {
-                "model": model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You explain passive OSINT dependency intelligence reports in simple human language. "
-                            "Do not claim exploitability unless the report proves it. Say exploit signals are suggested leads."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.2,
-                "top_p": 0.95,
-                "max_tokens": 8192,
-                "seed": 42,
-                "chat_template_kwargs": {"enable_thinking": False},
-            },
-            headers={"Authorization": f"Bearer {api_key}"},
-        )
-        text = response["choices"][0]["message"]["content"].strip()
-        text = _clean_text(text)
-        if not _looks_readable(text):
-            text = _local_fallback_summary(
-                aggregate_report,
-                "NVIDIA summary response was not readable, so a deterministic local summary was written.",
-            )
-    except (HttpError, KeyError, IndexError, TypeError) as exc:
-        text = _local_fallback_summary(aggregate_report, f"NVIDIA summary failed: {exc}")
-    summary_path.write_text(_clean_text(text) + "\n", encoding="utf-8")
-    return summary_path
-
-
 def _summary_prompt(aggregate_report: dict[str, Any]) -> str:
     compact = {
         "aggregate": aggregate_report.get("aggregate", {}),
@@ -258,55 +123,6 @@ def _summary_prompt(aggregate_report: dict[str, Any]) -> str:
         "Be careful: version matches and exploit references are leads, not proof of exploitability.\n\n"
         + json.dumps(compact, indent=2)
     )
-
-
-def write_nvidia_target_summary(
-    target_report: dict[str, Any],
-    output_dir: Path,
-    api_key: str,
-    model: str,
-    target_name: str,
-    timeout: int = 120,
-) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    safe_stem = _safe_filename(target_name)
-    summary_path = output_dir / f"{safe_stem}_nvidia_summary.txt"
-    prompt = _target_summary_prompt(target_report)
-    client = HttpClient(timeout=timeout)
-    try:
-        response = client.post_json(
-            NVIDIA_BASE_URL,
-            {
-                "model": model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You explain passive OSINT dependency intelligence reports in simple human language. "
-                            "Do not claim exploitability unless the report proves it. Say exploit signals are suggested leads."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.2,
-                "top_p": 0.95,
-                "max_tokens": 8192,
-                "seed": 42,
-                "chat_template_kwargs": {"enable_thinking": False},
-            },
-            headers={"Authorization": f"Bearer {api_key}"},
-        )
-        text = response["choices"][0]["message"]["content"].strip()
-        text = _clean_text(text)
-        if not _looks_readable(text):
-            text = _local_fallback_target_summary(
-                target_report,
-                "NVIDIA summary response was not readable, so a deterministic local summary was written.",
-            )
-    except (HttpError, KeyError, IndexError, TypeError) as exc:
-        text = _local_fallback_target_summary(target_report, f"NVIDIA summary failed: {exc}")
-    summary_path.write_text(_clean_text(text) + "\n", encoding="utf-8")
-    return summary_path
 
 
 def _target_summary_prompt(target_report: dict[str, Any]) -> str:

@@ -198,26 +198,26 @@ def test_get_nonexistent_aggregate_report(mock_config_and_output):
     assert response.status_code == 404
 
 
-def test_get_nvidia_summary(mock_config_and_output):
+def test_get_opencode_summary(mock_config_and_output):
     _, temp_output_dir = mock_config_and_output
 
-    summary_file = temp_output_dir / "test-target_nvidia_summary.txt"
+    summary_file = temp_output_dir / "test-target_opencode_summary.txt"
     summary_file.write_text("Mock summary content", encoding="utf-8")
 
-    response = client.get("/api/reports/nvidia-summary/test-target")
+    response = client.get("/api/reports/opencode-summary/test-target")
     assert response.status_code == 200
     assert response.json()["summary"] == "Mock summary content"
 
 
-def test_get_nonexistent_nvidia_summary(mock_config_and_output):
-    response = client.get("/api/reports/nvidia-summary/test-target")
+def test_get_nonexistent_opencode_summary(mock_config_and_output):
+    response = client.get("/api/reports/opencode-summary/test-target")
     assert response.status_code == 404
 
 
 def test_delete_report_removes_all_artifacts(mock_config_and_output):
     _, temp_output_dir = mock_config_and_output
 
-    for suffix in (".json", ".txt", ".dot", "_cyclonedx.json", "_spdx.json", "_nvidia_summary.txt"):
+    for suffix in (".json", ".txt", ".dot", "_cyclonedx.json", "_spdx.json", "_opencode_summary.txt"):
         (temp_output_dir / f"test-target{suffix}").write_text("x", encoding="utf-8")
 
     response = client.delete("/api/reports/test-target")
