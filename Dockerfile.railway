@@ -11,6 +11,9 @@ RUN pip install --no-cache-dir "fastapi>=0.100.0" "uvicorn>=0.20.0"
 
 COPY osintdepintel/ ./osintdepintel/
 COPY examples/ ./examples/
+# Offline demo data — the dashboard defaults to Offline Mode so a shared link
+# returns fast, reliable reports without hitting (possibly dead) public targets.
+COPY tests/fixtures/ ./tests/fixtures/
 
 # Non-root user; make config and reports writable (the dashboard edits targets
 # and writes reports at runtime).
