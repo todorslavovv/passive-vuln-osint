@@ -163,20 +163,12 @@ tailwind.config = {
             <div class="h-px bg-border-subtle"></div>
             <label class="flex items-start gap-3 cursor-pointer">
               <input type="checkbox" id="scan-opt-offline" checked class="cyb-check mt-0.5">
-              <span class="text-[13px]"><strong>Offline Mode</strong> <span class="text-text-muted">(Fast, reliable demo data. Uncheck for a live scan — slower, and public targets may be down.)</span></span>
+              <span class="text-[13px]"><strong>Offline Mode</strong></span>
             </label>
-            <label class="flex items-start gap-3 cursor-pointer">
-              <input type="checkbox" id="scan-opt-skip-nvd" class="cyb-check mt-0.5">
-              <span class="text-[13px]"><strong>Bypass NVD Enrichment</strong> <span class="text-text-muted">(Skip live NVD, use other providers)</span></span>
-            </label>
-            <p class="text-[12px] text-text-muted leading-relaxed">A plain-language <strong class="text-on-surface">AI summary</strong> is generated automatically for each scan when the server is configured with an OpenCode key — no setup needed.</p>
-            <div>
-              <label class="block text-[13px] mb-2" for="scan-opt-rate-limit">HTTP Rate Limit (requests/second): <span id="rate-limit-val" class="text-primary-container font-mono">4.0</span></label>
-              <input type="range" id="scan-opt-rate-limit" min="1" max="20" step="0.5" value="4.0" class="w-full">
-            </div>
-            <div>
-              <label class="block text-[13px] mb-2" for="scan-opt-max-deps">Enrichment Dependency Limit (blank for no cap)</label>
-              <input type="number" id="scan-opt-max-deps" min="1" placeholder="e.g. 50" class="cyb-input w-full">
+            <div class="cyb-inset p-4 text-[12px] leading-relaxed text-text-muted">
+              <p><strong class="text-primary-container">Offline (checked)</strong> — uses built-in demo data. Instant and always works. Recommended.</p>
+              <p class="mt-2"><strong class="text-on-surface">Live scan (unchecked)</strong> — actually crawls the real target website over the internet. Slower, and some public sites may be offline.</p>
+              <p class="mt-2">A plain-language <strong class="text-on-surface">AI summary</strong> is generated automatically after every scan.</p>
             </div>
             <button id="start-scan-btn" class="btn-primary w-full justify-center py-3 text-[15px]">
               <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1;">play_arrow</span> Launch Scan Engine
@@ -314,6 +306,6 @@ tailwind.config = {
 </div>
 
 <script src="graph-renderer.js?v=20260904"></script>
-<script src="app.js?v=20260901"></script>
+<script src="app.js?v=20260905"></script>
 </body>
 </html>
