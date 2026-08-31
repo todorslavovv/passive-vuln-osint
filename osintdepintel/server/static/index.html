@@ -32,7 +32,7 @@ tailwind.config = {
   } }
 }
 </script>
-<link rel="stylesheet" href="app.css?v=20260901"/>
+<link rel="stylesheet" href="app.css?v=20260902"/>
 </head>
 <body class="font-sans antialiased flex h-screen w-screen overflow-hidden bg-background text-on-surface">
 
@@ -229,19 +229,19 @@ tailwind.config = {
             <!-- OVERVIEW -->
             <div class="sub-tab-pane active" id="subtab-overview">
               <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
-                <div class="cyb-inset p-4"><div class="text-[11px] uppercase tracking-wider text-text-muted">Total Dependencies</div><div class="text-[28px] font-bold mt-1" id="ro-deps-count">0</div><div class="text-[12px] text-text-muted" id="ro-deps-confirmed-inferred">0 confirmed, 0 inferred</div></div>
-                <div class="cyb-inset p-4"><div class="text-[11px] uppercase tracking-wider text-text-muted">Vulnerability Count</div><div class="text-[28px] font-bold mt-1 text-severity-critical" id="ro-vulns-count">0</div><div class="text-[12px] text-text-muted" id="ro-vulns-finding-count">Linked to 0 ranked findings</div></div>
-                <div class="cyb-inset p-4"><div class="text-[11px] uppercase tracking-wider text-text-muted">Confidence Floor</div><div class="text-[28px] font-bold mt-1 text-severity-low" id="ro-confidence-floor">1.0</div><div class="text-[12px] text-text-muted">Lowest value resolved</div></div>
+                <div class="cyb-inset p-5"><div class="text-[11px] uppercase tracking-wider text-text-muted">Total Dependencies</div><div class="text-[30px] font-bold mt-2 leading-none" id="ro-deps-count">0</div><div class="text-[12px] text-text-muted mt-2" id="ro-deps-confirmed-inferred">0 confirmed, 0 inferred</div></div>
+                <div class="cyb-inset p-5"><div class="text-[11px] uppercase tracking-wider text-text-muted">Vulnerability Count</div><div class="text-[30px] font-bold mt-2 leading-none text-severity-critical" id="ro-vulns-count">0</div><div class="text-[12px] text-text-muted mt-2" id="ro-vulns-finding-count">Linked to 0 ranked findings</div></div>
+                <div class="cyb-inset p-5"><div class="text-[11px] uppercase tracking-wider text-text-muted">Confidence Floor</div><div class="text-[30px] font-bold mt-2 leading-none text-severity-low" id="ro-confidence-floor">1.0</div><div class="text-[12px] text-text-muted mt-2">Lowest value resolved</div></div>
               </div>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter mt-gutter">
-                <div class="cyb-inset p-4"><h3 class="text-[14px] font-semibold mb-3">Source Coverage</h3><div class="data-tag-container" id="ro-sources-container"></div></div>
-                <div class="cyb-inset p-4"><h3 class="text-[14px] font-semibold mb-3">Confidence Distribution</h3><div class="progress-list" id="ro-confidence-distribution"></div></div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter mt-gutter items-start">
+                <div class="cyb-inset p-5"><h3 class="text-[13px] font-semibold uppercase tracking-wider text-text-muted mb-4">Source Coverage</h3><div class="data-tag-container" id="ro-sources-container"></div></div>
+                <div class="cyb-inset p-5"><h3 class="text-[13px] font-semibold uppercase tracking-wider text-text-muted mb-4">Confidence Distribution</h3><div class="progress-list" id="ro-confidence-distribution"></div></div>
               </div>
-              <div class="cyb-inset p-4 mt-gutter">
-                <h3 class="text-[14px] font-semibold mb-3">Passive Collection Gaps &amp; Conflicts</h3>
-                <h4 class="text-[12px] uppercase tracking-wider text-text-muted mb-2">Gaps</h4>
+              <div class="cyb-inset p-5 mt-gutter">
+                <h3 class="text-[13px] font-semibold uppercase tracking-wider text-text-muted mb-4">Passive Collection Gaps &amp; Conflicts</h3>
+                <h4 class="text-[11px] uppercase tracking-wider text-text-muted/70 mb-2">Gaps</h4>
                 <div class="gaps-list" id="ro-gaps-container"></div>
-                <h4 class="text-[12px] uppercase tracking-wider text-text-muted mb-2 mt-4">Conflicts</h4>
+                <h4 class="text-[11px] uppercase tracking-wider text-text-muted/70 mb-2 mt-5">Conflicts</h4>
                 <div class="conflicts-list" id="ro-conflicts-container"></div>
               </div>
             </div>

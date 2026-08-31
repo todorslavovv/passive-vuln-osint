@@ -318,42 +318,32 @@ body {
     text-decoration: none;
 }
 
-.btn-primary {
-    background: var(--grad-primary);
-    color: var(--bg-main);
-    font-weight: 600;
-    box-shadow: var(--shadow-glow-cyan);
-}
-
-.btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
-}
-
 .btn-secondary {
-    background: rgba(255, 255, 255, 0.04);
+    background: transparent;
     border-color: var(--border-color);
-    color: var(--text-primary);
+    color: var(--text-secondary);
 }
 
 .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--border-color-hover);
+    color: var(--accent-cyan);
 }
 
 .btn-danger {
-    background: rgba(255, 8, 68, 0.1);
-    border-color: rgba(255, 8, 68, 0.2);
-    color: #ff5252;
+    background: transparent;
+    border-color: var(--border-color);
+    color: var(--text-secondary);
 }
 
 .btn-danger:hover {
-    background: rgba(255, 8, 68, 0.2);
-    border-color: rgba(255, 8, 68, 0.4);
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: var(--color-critical);
 }
 
 .btn-sm {
-    padding: 6px 12px;
+    padding: 6px 14px;
     font-size: 13px;
 }
 
@@ -363,8 +353,9 @@ body {
 }
 
 .btn-xs {
-    padding: 4px 8px;
-    font-size: 11px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 500;
 }
 
 .btn-block {
@@ -714,21 +705,23 @@ body {
 }
 
 .report-list-card {
-    background: rgba(255, 255, 255, 0.015);
+    background: var(--bg-main);
     border: 1px solid var(--border-color);
+    border-left: 2px solid transparent;
     border-radius: 5px;
-    padding: 14px;
+    padding: 16px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.15s, border-color 0.15s;
 }
 
-.report-list-card:hover, .report-list-card.active {
-    background: rgba(255, 255, 255, 0.03);
+.report-list-card:hover {
+    background: var(--bg-card-hover);
     border-color: var(--border-color-hover);
 }
 
 .report-list-card.active {
-    box-shadow: 0 0 10px rgba(0, 242, 254, 0.1);
+    background: var(--bg-card-hover);
+    border-left-color: var(--accent-cyan);
 }
 
 .report-list-card h4 {
