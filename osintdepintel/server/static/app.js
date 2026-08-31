@@ -42,10 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Scanner
         scannerTargetsContainer: document.getElementById('scanner-targets-container'),
         scanOptOffline: document.getElementById('scan-opt-offline'),
-        scanOptSkipNvd: document.getElementById('scan-opt-skip-nvd'),
-        scanOptRateLimit: document.getElementById('scan-opt-rate-limit'),
-        rateLimitVal: document.getElementById('rate-limit-val'),
-        scanOptMaxDeps: document.getElementById('scan-opt-max-deps'),
         startScanBtn: document.getElementById('start-scan-btn'),
         clearConsoleBtn: document.getElementById('clear-console-btn'),
         terminalOutput: document.getElementById('terminal-output'),
@@ -394,10 +390,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    elements.scanOptRateLimit.addEventListener('input', () => {
-        elements.rateLimitVal.textContent = parseFloat(elements.scanOptRateLimit.value).toFixed(1);
-    });
-
     elements.startScanBtn.addEventListener('click', async () => {
         if (state.scanRunning) return;
 
@@ -409,11 +401,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Advanced knobs (NVD, rate limit, enrichment cap) are CLI-only now; the UI
+        // keeps just the Offline/Live choice. Live scans skip NVD for speed.
+        const offline = elements.scanOptOffline.checked;
         const options = {
-            offline: elements.scanOptOffline.checked,
-            skip_nvd: elements.scanOptSkipNvd.checked,
-            rate_limit: parseFloat(elements.scanOptRateLimit.value),
-            max_enrich_dependencies: elements.scanOptMaxDeps.value ? parseInt(elements.scanOptMaxDeps.value) : null
+            offline: offline,
+            skip_nvd: !offline
         };
 
         try {

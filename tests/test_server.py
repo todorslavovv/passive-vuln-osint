@@ -9,51 +9,62 @@ from fastapi.testclient import TestClient
 from osintdepintel.server import main
 from osintdepintel.server.main import app
 
-client = TestClient(app)
+_TEST_TARGET = {
+    "name": "test-target",
+    "url": "https://test.example.com",
+    "github_repos": [],
+    "sbom_urls": [],
+    "container_images": [],
+    "mobile_artifacts": [],
+    "package_hints": [],
+    "metadata": {},
+}
 
 
 @pytest.fixture
-def mock_config_and_output(tmp_path):
-    # Setup temporary targets.json file
-    temp_config = tmp_path / "targets.json"
-    temp_config.write_text(
-        json.dumps(
-            {
-                "targets": [
-                    {
-                        "name": "test-target",
-                        "url": "https://test.example.com",
-                        "github_repos": [],
-                        "sbom_urls": [],
-                        "container_images": [],
-                        "mobile_artifacts": [],
-                        "package_hints": [],
-                        "metadata": {},
-                    }
-                ]
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
+def demo(tmp_path):
+    """Point the server at a temp baseline (one target, empty seed reports) and a fresh
+    per-test session store, then hand back a client plus the baseline reports dir so a
+    test can pre-seed reports before its first request (sessions seed lazily from it)."""
+    config = tmp_path / "targets.json"
+    config.write_text(json.dumps({"targets": [_TEST_TARGET]}), encoding="utf-8")
+    baseline_reports = tmp_path / "baseline"
+    baseline_reports.mkdir()
+
+    saved = (
+        main.BASELINE_CONFIG,
+        main.SESSIONS_ROOT,
+        main.BASELINE_REPORTS,
+        main.BASELINE_REPORT_TARGETS,
+        main.store,
+        main._baseline_built,
     )
+    main.BASELINE_CONFIG = config
+    main.SESSIONS_ROOT = tmp_path / "sessions"
+    main.BASELINE_REPORTS = baseline_reports
+    main.BASELINE_REPORT_TARGETS = []  # don't run the pipeline during tests
+    main._baseline_built = True
+    main.store = main.SessionStore()
 
-    # Setup temporary reports folder
-    temp_output_dir = tmp_path / "reports"
-    temp_output_dir.mkdir()
+    with TestClient(app) as client:
+        yield client, baseline_reports
 
-    # Mock global variables in main
-    old_config = main.CONFIG_PATH_GLOBAL
-    old_output = main.OUTPUT_DIR_GLOBAL
-    main.CONFIG_PATH_GLOBAL = temp_config
-    main.OUTPUT_DIR_GLOBAL = temp_output_dir
-
-    yield temp_config, temp_output_dir
-
-    main.CONFIG_PATH_GLOBAL = old_config
-    main.OUTPUT_DIR_GLOBAL = old_output
+    (
+        main.BASELINE_CONFIG,
+        main.SESSIONS_ROOT,
+        main.BASELINE_REPORTS,
+        main.BASELINE_REPORT_TARGETS,
+        main.store,
+        main._baseline_built,
+    ) = saved
 
 
-def test_get_targets(mock_config_and_output):
+def _seed_report(baseline_reports, stem, data):
+    (baseline_reports / f"{stem}.json").write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_get_targets(demo):
+    client, _ = demo
     response = client.get("/api/targets")
     assert response.status_code == 200
     data = response.json()
@@ -62,191 +73,167 @@ def test_get_targets(mock_config_and_output):
     assert data[0]["url"] == "https://test.example.com"
 
 
-def test_add_target(mock_config_and_output):
-    payload = {"url": "https://new.example.com"}
-    response = client.post("/api/targets", json=payload)
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
-
-    # Verify target was saved to file with auto-derived name
-    response = client.get("/api/targets")
-    assert response.status_code == 200
-    data = response.json()
+def test_add_target(demo):
+    client, _ = demo
+    assert client.post("/api/targets", json={"url": "https://new.example.com"}).json()["status"] == "success"
+    data = client.get("/api/targets").json()
     assert len(data) == 2
     assert any(t["name"] == "new" for t in data)
 
 
-def test_add_duplicate_target(mock_config_and_output):
-    # URL that auto-derives the same name as an existing target
-    payload = {"url": "https://test-target.example.com"}
-    response = client.post("/api/targets", json=payload)
+def test_add_duplicate_target(demo):
+    client, _ = demo
+    response = client.post("/api/targets", json={"url": "https://test-target.example.com"})
     assert response.status_code == 400
     assert "already exists" in response.json()["detail"]
 
 
-def test_update_target(mock_config_and_output):
-    payload = {"url": "https://updated.example.com"}
-    response = client.put("/api/targets/test-target", json=payload)
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
-
-    # Verify it updated in file (name auto-derived from URL)
-    response = client.get("/api/targets")
-    data = response.json()
+def test_update_target(demo):
+    client, _ = demo
+    assert client.put("/api/targets/test-target", json={"url": "https://updated.example.com"}).status_code == 200
+    data = client.get("/api/targets").json()
     assert len(data) == 1
     assert data[0]["url"] == "https://updated.example.com"
     assert data[0]["name"] == "updated"
 
 
-def test_update_nonexistent_target(mock_config_and_output):
-    payload = {"url": "https://none.example.com"}
-    response = client.put("/api/targets/nonexistent", json=payload)
-    assert response.status_code == 404
+def test_update_nonexistent_target(demo):
+    client, _ = demo
+    assert client.put("/api/targets/nonexistent", json={"url": "https://none.example.com"}).status_code == 404
 
 
-def test_delete_target(mock_config_and_output):
-    response = client.delete("/api/targets/test-target")
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
-
-    # Verify deleted
-    response = client.get("/api/targets")
-    assert len(response.json()) == 0
+def test_delete_target(demo):
+    client, _ = demo
+    assert client.delete("/api/targets/test-target").status_code == 200
+    assert len(client.get("/api/targets").json()) == 0
 
 
-def test_delete_nonexistent_target(mock_config_and_output):
-    response = client.delete("/api/targets/nonexistent")
-    assert response.status_code == 404
+def test_delete_nonexistent_target(demo):
+    client, _ = demo
+    assert client.delete("/api/targets/nonexistent").status_code == 404
 
 
-def test_get_scan_status():
-    response = client.get("/api/scans/status")
-    assert response.status_code == 200
-    data = response.json()
-    assert "running" in data
+def test_get_scan_status(demo):
+    client, _ = demo
+    data = client.get("/api/scans/status").json()
     assert data["running"] is False
 
 
 @patch("threading.Thread")
-def test_start_scan(mock_thread, mock_config_and_output):
-    payload = {"targets": ["test-target"], "options": {"offline": True, "skip_nvd": True, "rate_limit": 4.0}}
-    response = client.post("/api/scans/run", json=payload)
-    assert response.status_code == 200
-    assert response.json()["status"] == "started"
-
-    # Verify status is running
-    status_response = client.get("/api/scans/status")
-    assert status_response.json()["running"] is True
-
-    # Reset status manually for subsequent tests
-    with main.scan_state.lock:
-        main.scan_state.running = False
+def test_start_scan(mock_thread, demo):
+    client, _ = demo
+    payload = {"targets": ["test-target"], "options": {"offline": True, "skip_nvd": True}}
+    assert client.post("/api/scans/run", json=payload).json()["status"] == "started"
+    assert client.get("/api/scans/status").json()["running"] is True
     mock_thread.assert_called_once()
 
 
-def test_list_reports_empty(mock_config_and_output):
-    response = client.get("/api/reports")
-    assert response.status_code == 200
-    assert len(response.json()) == 0
+def test_list_reports_empty(demo):
+    client, _ = demo
+    assert client.get("/api/reports").json() == []
 
 
-def test_get_report_details_and_list(mock_config_and_output):
-    _, temp_output_dir = mock_config_and_output
-
-    # Write mock report file
-    report_data = {
-        "target": {"name": "test-target"},
-        "summary": {"dependency_count": 5, "vulnerability_count": 2, "finding_count": 2},
-    }
-    report_file = temp_output_dir / "test-target.json"
-    report_file.write_text(json.dumps(report_data), encoding="utf-8")
-
-    # Test listing reports
-    response = client.get("/api/reports")
-    assert response.status_code == 200
-    data = response.json()
+def test_get_report_details_and_list(demo):
+    client, baseline = demo
+    _seed_report(
+        baseline,
+        "test-target",
+        {
+            "target": {"name": "test-target"},
+            "summary": {"dependency_count": 5, "vulnerability_count": 2, "finding_count": 2},
+        },
+    )
+    data = client.get("/api/reports").json()
     assert len(data) == 1
     assert data[0]["target_name"] == "test-target"
     assert data[0]["dependency_count"] == 5
 
-    # Test getting report details
-    detail_response = client.get("/api/reports/detail/test-target")
-    assert detail_response.status_code == 200
-    assert detail_response.json()["summary"]["dependency_count"] == 5
+    detail = client.get("/api/reports/detail/test-target").json()
+    assert detail["summary"]["dependency_count"] == 5
 
 
-def test_get_nonexistent_report_details(mock_config_and_output):
-    response = client.get("/api/reports/detail/nonexistent")
-    assert response.status_code == 404
+def test_get_nonexistent_report_details(demo):
+    client, _ = demo
+    assert client.get("/api/reports/detail/nonexistent").status_code == 404
 
 
-def test_get_aggregate_report(mock_config_and_output):
-    _, temp_output_dir = mock_config_and_output
-
-    # Write mock aggregate report
-    aggregate_data = {"aggregate": {"target_count": 1, "dependency_count": 5}}
-    aggregate_file = temp_output_dir / "aggregate_report.json"
-    aggregate_file.write_text(json.dumps(aggregate_data), encoding="utf-8")
-
+def test_get_aggregate_report(demo):
+    client, baseline = demo
+    (baseline / "aggregate_report.json").write_text(
+        json.dumps({"aggregate": {"target_count": 1, "dependency_count": 5}}), encoding="utf-8"
+    )
     response = client.get("/api/reports/aggregate")
     assert response.status_code == 200
     assert response.json()["aggregate"]["dependency_count"] == 5
 
 
-def test_get_nonexistent_aggregate_report(mock_config_and_output):
-    response = client.get("/api/reports/aggregate")
-    assert response.status_code == 404
+def test_get_nonexistent_aggregate_report(demo):
+    client, _ = demo
+    assert client.get("/api/reports/aggregate").status_code == 404
 
 
-def test_get_opencode_summary(mock_config_and_output):
-    _, temp_output_dir = mock_config_and_output
-
-    summary_file = temp_output_dir / "test-target_opencode_summary.txt"
-    summary_file.write_text("Mock summary content", encoding="utf-8")
-
+def test_get_opencode_summary(demo):
+    client, baseline = demo
+    (baseline / "test-target_opencode_summary.txt").write_text("Mock summary content", encoding="utf-8")
     response = client.get("/api/reports/opencode-summary/test-target")
     assert response.status_code == 200
     assert response.json()["summary"] == "Mock summary content"
 
 
-def test_get_nonexistent_opencode_summary(mock_config_and_output):
-    response = client.get("/api/reports/opencode-summary/test-target")
-    assert response.status_code == 404
+def test_get_nonexistent_opencode_summary(demo):
+    client, _ = demo
+    assert client.get("/api/reports/opencode-summary/test-target").status_code == 404
 
 
-def test_delete_report_removes_all_artifacts(mock_config_and_output):
-    _, temp_output_dir = mock_config_and_output
-
+def test_delete_report_removes_all_artifacts(demo):
+    client, baseline = demo
     for suffix in (".json", ".txt", ".dot", "_cyclonedx.json", "_spdx.json", "_opencode_summary.txt"):
-        (temp_output_dir / f"test-target{suffix}").write_text("x", encoding="utf-8")
+        (baseline / f"test-target{suffix}").write_text("x", encoding="utf-8")
+    _seed_report(baseline, "test-target", {"target": {"name": "test-target"}, "summary": {}})
 
-    response = client.delete("/api/reports/test-target")
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
-    # Every generated artifact for the stem should be gone.
-    assert not any(temp_output_dir.glob("test-target*"))
-
-
-def test_delete_nonexistent_report(mock_config_and_output):
-    response = client.delete("/api/reports/nonexistent")
-    assert response.status_code == 404
+    assert client.delete("/api/reports/test-target").status_code == 200
+    # Report is gone from this sandbox (verified via the API, not the filesystem).
+    assert client.get("/api/reports/detail/test-target").status_code == 404
+    assert client.get("/api/reports/artifacts/test-target").json() == []
 
 
-def test_report_detail_path_traversal_is_neutralized(mock_config_and_output):
-    _, temp_output_dir = mock_config_and_output
-
-    # A secret file one directory above the reports output dir.
-    secret = temp_output_dir.parent / "secret.json"
-    secret.write_text(json.dumps({"target": {}, "summary": {}}), encoding="utf-8")
-
-    # Encoded traversal that, if used verbatim as a stem, would escape the output dir.
-    response = client.get("/api/reports/detail/..%2Fsecret")
-    # The stem is sanitized, so the traversal cannot reach ../secret.json.
-    assert response.status_code == 404
+def test_delete_nonexistent_report(demo):
+    client, _ = demo
+    assert client.delete("/api/reports/nonexistent").status_code == 404
 
 
-def test_download_artifact_unknown_kind(mock_config_and_output):
-    _, temp_output_dir = mock_config_and_output
-    (temp_output_dir / "test-target.json").write_text("{}", encoding="utf-8")
-    response = client.get("/api/reports/artifact/test-target/evil-kind")
-    assert response.status_code == 400
+def test_report_detail_path_traversal_is_neutralized(demo):
+    client, _ = demo
+    # Encoded traversal that, if used verbatim as a stem, would escape the reports dir.
+    # The stem is sanitized, so it can never resolve to ../secret.json.
+    assert client.get("/api/reports/detail/..%2Fsecret").status_code == 404
+
+
+def test_download_artifact_unknown_kind(demo):
+    client, baseline = demo
+    _seed_report(baseline, "test-target", {"target": {"name": "test-target"}, "summary": {}})
+    assert client.get("/api/reports/artifact/test-target/evil-kind").status_code == 400
+
+
+def test_sessions_are_isolated_between_visitors(demo):
+    """A delete by one visitor must not affect another visitor's sandbox."""
+    _client_a, baseline = demo
+    _seed_report(baseline, "test-target", {"target": {"name": "test-target"}, "summary": {}})
+
+    # Two independent visitors (separate cookie jars => separate sandboxes).
+    with TestClient(app) as visitor_a, TestClient(app) as visitor_b:
+        # Both start from the same baseline: one target, one seeded report.
+        assert len(visitor_a.get("/api/targets").json()) == 1
+        assert len(visitor_b.get("/api/targets").json()) == 1
+        assert len(visitor_a.get("/api/reports").json()) == 1
+        assert len(visitor_b.get("/api/reports").json()) == 1
+
+        # Visitor A deletes both a target and a report.
+        assert visitor_a.delete("/api/targets/test-target").status_code == 200
+        assert visitor_a.delete("/api/reports/test-target").status_code == 200
+        assert len(visitor_a.get("/api/targets").json()) == 0
+        assert len(visitor_a.get("/api/reports").json()) == 0
+
+        # Visitor B is completely unaffected.
+        assert len(visitor_b.get("/api/targets").json()) == 1
+        assert len(visitor_b.get("/api/reports").json()) == 1

@@ -6,7 +6,10 @@ import logging
 import os
 import queue
 import re
+import shutil
 import threading
+import time
+import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from pathlib import Path
 from typing import Any, cast
@@ -25,7 +28,6 @@ from ..reporting.writers import _safe_filename
 
 app = FastAPI(title="OSINT Dependency Intelligence Dashboard")
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,10 +37,23 @@ app.add_middleware(
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-# Config and output locations are env-overridable so the container/Railway deploy can
-# point them at writable, repo-independent paths (a wheel install has no examples/reports).
-CONFIG_PATH_GLOBAL = Path(os.environ.get("OSINT_CONFIG_PATH", PROJECT_ROOT / "examples" / "targets.json"))
-OUTPUT_DIR_GLOBAL = Path(os.environ.get("OSINT_OUTPUT_DIR", PROJECT_ROOT / "reports"))
+
+# The read-only "master" target list every visitor starts from. Env-overridable so a
+# wheel/container deploy can point it at a real file (a wheel has no examples/).
+BASELINE_CONFIG = Path(os.environ.get("OSINT_CONFIG_PATH", PROJECT_ROOT / "examples" / "targets.json"))
+# Root under which each visitor gets a private, disposable sandbox (targets + reports).
+SESSIONS_ROOT = Path(
+    os.environ.get(
+        "OSINT_SESSIONS_DIR", Path(os.environ.get("OSINT_OUTPUT_DIR", PROJECT_ROOT / "reports")).parent / "_sessions"
+    )
+)
+# Pre-generated demo reports every new sandbox is seeded with (so the dashboard is not empty).
+BASELINE_REPORTS = SESSIONS_ROOT / "_baseline"
+BASELINE_REPORT_TARGETS = ["otakuflorist", "juice-shop"]
+
+SESSION_COOKIE = "osint_session"
+SESSION_TTL = int(os.environ.get("OSINT_SESSION_TTL", 6 * 3600))  # seconds a sandbox lives
+_SWEEP_INTERVAL = 300  # seconds between expiry sweeps
 
 
 class ScanState:
@@ -51,18 +66,123 @@ class ScanState:
         self.lock = threading.Lock()
 
 
-scan_state = ScanState()
-
-
 class QueueLogHandler(logging.Handler):
-    def __init__(self, state: ScanState) -> None:
+    """Routes log records to one scan's queue only (filtered by the scan thread), so
+    concurrent visitors' scans never see each other's log lines."""
+
+    def __init__(self, state: ScanState, thread_ident: int) -> None:
         super().__init__()
         self.state = state
+        self.thread_ident = thread_ident
         self.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
 
     def emit(self, record: logging.LogRecord) -> None:
-        msg = self.format(record)
-        self.state.log_queue.put(msg)
+        if record.thread != self.thread_ident:
+            return
+        self.state.log_queue.put(self.format(record))
+
+
+class Session:
+    def __init__(self, sid: str) -> None:
+        self.id = sid
+        self.dir = SESSIONS_ROOT / sid
+        self.config_path = self.dir / "targets.json"
+        self.output_dir = self.dir / "reports"
+        self.scan_state = ScanState()
+        self.last_access = time.time()
+
+
+_baseline_built = False
+_baseline_lock = threading.Lock()
+
+
+def build_baseline() -> None:
+    """Generate the shared seed reports once (idempotent). Offline + a one-off AI summary
+    per report if a key is configured — runs a single time, not per visitor."""
+    global _baseline_built
+    with _baseline_lock:
+        if _baseline_built:
+            return
+        BASELINE_REPORTS.mkdir(parents=True, exist_ok=True)
+        if any(BASELINE_REPORTS.glob("*.json")):
+            _baseline_built = True
+            return
+        try:
+            if BASELINE_CONFIG.exists():
+                targets = load_targets(BASELINE_CONFIG)
+                seed = [t for t in targets if t.name in BASELINE_REPORT_TARGETS]
+                if seed:
+                    result = Pipeline(offline=True, enable_nvd=False).process_targets(
+                        seed, output_dir=BASELINE_REPORTS, include_graph=True
+                    )
+                    key = os.environ.get("OPENCODE_API_KEY")
+                    if key:
+                        model = os.environ.get("OPENCODE_MODEL", OPENCODE_DEFAULT_MODEL)
+                        for report in result["reports"]:
+                            write_opencode_target_summary(
+                                report, BASELINE_REPORTS, key, model, report["target"]["name"]
+                            )
+        except Exception:
+            logger.exception("Failed to build baseline demo reports")
+        _baseline_built = True
+
+
+def _seed_session(session: Session) -> None:
+    session.output_dir.mkdir(parents=True, exist_ok=True)
+    if BASELINE_CONFIG.exists():
+        shutil.copyfile(BASELINE_CONFIG, session.config_path)
+    else:
+        session.config_path.write_text('{"targets": []}', encoding="utf-8")
+    build_baseline()
+    if BASELINE_REPORTS.exists():
+        for f in BASELINE_REPORTS.glob("*"):
+            if f.is_file():
+                shutil.copyfile(f, session.output_dir / f.name)
+
+
+class SessionStore:
+    def __init__(self) -> None:
+        self.sessions: dict[str, Session] = {}
+        self.lock = threading.Lock()
+        self._last_sweep = time.time()
+
+    def get(self, sid: str) -> Session:
+        with self.lock:
+            self._maybe_sweep()
+            session = self.sessions.get(sid)
+            if session is None:
+                session = Session(sid)
+                _seed_session(session)
+                self.sessions[sid] = session
+            session.last_access = time.time()
+            return session
+
+    def _maybe_sweep(self) -> None:
+        now = time.time()
+        if now - self._last_sweep < _SWEEP_INTERVAL:
+            return
+        self._last_sweep = now
+        cutoff = now - SESSION_TTL
+        for sid in [s for s, sess in self.sessions.items() if sess.last_access < cutoff]:
+            dead = self.sessions.pop(sid)
+            shutil.rmtree(dead.dir, ignore_errors=True)
+
+
+store = SessionStore()
+
+
+def _valid_sid(sid: str | None) -> bool:
+    return bool(sid) and re.fullmatch(r"[0-9a-f]{32}", sid or "") is not None
+
+
+def _session(request: Request) -> Session:
+    sid = getattr(request.state, "session_id", None) or "default_session_00000000000000000000"
+    return store.get(sid)
+
+
+def save_targets_file(config_path: Path, targets: list[TargetConfig]) -> None:
+    with config_path.open("w", encoding="utf-8") as f:
+        json.dump({"targets": [t.to_dict() for t in targets]}, f, indent=2)
 
 
 def parse_url_to_target(url: str) -> dict[str, Any]:
@@ -120,30 +240,31 @@ def parse_url_to_target(url: str) -> dict[str, Any]:
 
 
 @app.get("/api/targets")
-def get_targets() -> list[dict[str, Any]]:
+def get_targets(request: Request) -> list[dict[str, Any]]:
     try:
-        targets = load_targets(CONFIG_PATH_GLOBAL)
+        targets = load_targets(_session(request).config_path)
         return [t.to_dict() for t in targets]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/targets")
-def add_target(payload: dict[str, Any]) -> dict[str, Any]:
+def add_target(request: Request, payload: dict[str, Any]) -> dict[str, Any]:
     try:
         url = payload.get("url", "").strip()
         if not url:
             raise HTTPException(status_code=400, detail="Target URL is required")
 
+        config_path = _session(request).config_path
         parsed_payload = parse_url_to_target(url)
-        targets = load_targets(CONFIG_PATH_GLOBAL)
+        targets = load_targets(config_path)
 
         if any(t.name == parsed_payload["name"] for t in targets):
             raise HTTPException(status_code=400, detail=f"Target '{parsed_payload['name']}' already exists")
 
         new_target = TargetConfig.from_dict(parsed_payload)
         targets.append(new_target)
-        save_targets_file(targets)
+        save_targets_file(config_path, targets)
         return {"status": "success", "target": new_target.to_dict()}
     except HTTPException:
         raise
@@ -152,14 +273,15 @@ def add_target(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 @app.put("/api/targets/{name}")
-def update_target(name: str, payload: dict[str, Any]) -> dict[str, Any]:
+def update_target(request: Request, name: str, payload: dict[str, Any]) -> dict[str, Any]:
     try:
         url = payload.get("url", "").strip()
         if not url:
             raise HTTPException(status_code=400, detail="Target URL is required")
 
+        config_path = _session(request).config_path
         parsed_payload = parse_url_to_target(url)
-        targets = load_targets(CONFIG_PATH_GLOBAL)
+        targets = load_targets(config_path)
 
         index = -1
         for i, t in enumerate(targets):
@@ -171,7 +293,7 @@ def update_target(name: str, payload: dict[str, Any]) -> dict[str, Any]:
 
         updated_target = TargetConfig.from_dict(parsed_payload)
         targets[index] = updated_target
-        save_targets_file(targets)
+        save_targets_file(config_path, targets)
         return {"status": "success", "target": updated_target.to_dict()}
     except HTTPException:
         raise
@@ -180,13 +302,14 @@ def update_target(name: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 @app.delete("/api/targets/{name}")
-def delete_target(name: str) -> dict[str, str]:
+def delete_target(request: Request, name: str) -> dict[str, str]:
     try:
-        targets = load_targets(CONFIG_PATH_GLOBAL)
+        config_path = _session(request).config_path
+        targets = load_targets(config_path)
         filtered = [t for t in targets if t.name != name]
         if len(filtered) == len(targets):
             raise HTTPException(status_code=404, detail=f"Target '{name}' not found")
-        save_targets_file(filtered)
+        save_targets_file(config_path, filtered)
         return {"status": "success"}
     except HTTPException:
         raise
@@ -194,18 +317,14 @@ def delete_target(name: str) -> dict[str, str]:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-def save_targets_file(targets: list[TargetConfig]) -> None:
-    with CONFIG_PATH_GLOBAL.open("w", encoding="utf-8") as f:
-        json.dump({"targets": [t.to_dict() for t in targets]}, f, indent=2)
-
-
 @app.get("/api/reports")
-def list_reports() -> list[dict[str, Any]]:
+def list_reports(request: Request) -> list[dict[str, Any]]:
     try:
-        if not OUTPUT_DIR_GLOBAL.exists():
+        output_dir = _session(request).output_dir
+        if not output_dir.exists():
             return []
         reports = []
-        for file in OUTPUT_DIR_GLOBAL.glob("*.json"):
+        for file in output_dir.glob("*.json"):
             if file.name == "aggregate_report.json":
                 continue
             # Skip auxiliary SBOM exports; only list actual target intelligence reports.
@@ -235,8 +354,8 @@ def list_reports() -> list[dict[str, Any]]:
 
 
 @app.get("/api/reports/detail/{target_name}")
-def get_report_detail(target_name: str) -> dict[str, Any]:
-    report_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}.json"
+def get_report_detail(request: Request, target_name: str) -> dict[str, Any]:
+    report_file = _session(request).output_dir / f"{_safe_filename(target_name)}.json"
     if not report_file.exists():
         raise HTTPException(status_code=404, detail=f"Report for target '{target_name}' not found")
     try:
@@ -247,21 +366,15 @@ def get_report_detail(target_name: str) -> dict[str, Any]:
 
 
 @app.delete("/api/reports/{target_name}")
-def delete_report(target_name: str) -> dict[str, str]:
-    """Delete a target report and all of its generated artifacts."""
+def delete_report(request: Request, target_name: str) -> dict[str, str]:
+    """Delete a target report and all of its generated artifacts (from this sandbox only)."""
+    output_dir = _session(request).output_dir
     safe_stem = _safe_filename(target_name)
     deleted: list[str] = []
     not_found = True
-    suffixes = [
-        ".json",
-        ".txt",
-        ".dot",
-        "_cyclonedx.json",
-        "_spdx.json",
-        "_opencode_summary.txt",
-    ]
+    suffixes = [".json", ".txt", ".dot", "_cyclonedx.json", "_spdx.json", "_opencode_summary.txt"]
     for suffix in suffixes:
-        path = OUTPUT_DIR_GLOBAL / f"{safe_stem}{suffix}"
+        path = output_dir / f"{safe_stem}{suffix}"
         if path.exists():
             path.unlink()
             deleted.append(path.name)
@@ -272,8 +385,8 @@ def delete_report(target_name: str) -> dict[str, str]:
 
 
 @app.get("/api/reports/aggregate")
-def get_aggregate_report() -> dict[str, Any]:
-    report_file = OUTPUT_DIR_GLOBAL / "aggregate_report.json"
+def get_aggregate_report(request: Request) -> dict[str, Any]:
+    report_file = _session(request).output_dir / "aggregate_report.json"
     if not report_file.exists():
         raise HTTPException(status_code=404, detail="Aggregate report not found")
     try:
@@ -284,8 +397,8 @@ def get_aggregate_report() -> dict[str, Any]:
 
 
 @app.get("/api/reports/opencode-summary/{target_name}")
-def get_opencode_summary(target_name: str) -> dict[str, str]:
-    summary_file = OUTPUT_DIR_GLOBAL / f"{_safe_filename(target_name)}_opencode_summary.txt"
+def get_opencode_summary(request: Request, target_name: str) -> dict[str, str]:
+    summary_file = _session(request).output_dir / f"{_safe_filename(target_name)}_opencode_summary.txt"
     if not summary_file.exists():
         raise HTTPException(status_code=404, detail="OpenCode summary file not found")
     try:
@@ -295,9 +408,10 @@ def get_opencode_summary(target_name: str) -> dict[str, str]:
 
 
 @app.get("/api/reports/artifacts/{target_name}")
-def list_report_artifacts(target_name: str) -> list[dict[str, Any]]:
+def list_report_artifacts(request: Request, target_name: str) -> list[dict[str, Any]]:
     """Return the downloadable artifacts available for a target report stem."""
-    if not OUTPUT_DIR_GLOBAL.exists():
+    output_dir = _session(request).output_dir
+    if not output_dir.exists():
         return []
     # target_name from the report list is already the on-disk file stem.
     safe_stem = _safe_filename(target_name)
@@ -310,7 +424,7 @@ def list_report_artifacts(target_name: str) -> list[dict[str, Any]]:
         ("spdx", f"{safe_stem}_spdx.json", "application/json", "sbom.spdx.json"),
     ]
     for kind, filename, media_type, download_name in mapping:
-        path = OUTPUT_DIR_GLOBAL / filename
+        path = output_dir / filename
         if path.exists():
             artifacts.append(
                 {
@@ -323,7 +437,7 @@ def list_report_artifacts(target_name: str) -> list[dict[str, Any]]:
                 }
             )
     # Per-target AI summaries are exposed as downloads for this report stem.
-    opencode_file = OUTPUT_DIR_GLOBAL / f"{safe_stem}_opencode_summary.txt"
+    opencode_file = output_dir / f"{safe_stem}_opencode_summary.txt"
     if opencode_file.exists():
         artifacts.append(
             {
@@ -339,9 +453,10 @@ def list_report_artifacts(target_name: str) -> list[dict[str, Any]]:
 
 
 @app.get("/api/reports/artifact/{target_name}/{kind}")
-def download_report_artifact(target_name: str, kind: str) -> FileResponse:
+def download_report_artifact(request: Request, target_name: str, kind: str) -> FileResponse:
     """Serve a single report artifact with a friendly download name."""
-    if not OUTPUT_DIR_GLOBAL.exists():
+    output_dir = _session(request).output_dir
+    if not output_dir.exists():
         raise HTTPException(status_code=404, detail="Output directory not found")
 
     # target_name from the report list is already the on-disk file stem.
@@ -358,7 +473,7 @@ def download_report_artifact(target_name: str, kind: str) -> FileResponse:
         raise HTTPException(status_code=400, detail=f"Unknown artifact kind: {kind}")
 
     filename, media_type, download_name = artifact_map[kind]
-    path = OUTPUT_DIR_GLOBAL / filename
+    path = output_dir / filename
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Artifact '{filename}' not found")
     return FileResponse(
@@ -370,7 +485,8 @@ def download_report_artifact(target_name: str, kind: str) -> FileResponse:
 
 
 @app.get("/api/scans/status")
-def get_scan_status() -> dict[str, Any]:
+def get_scan_status(request: Request) -> dict[str, Any]:
+    scan_state = _session(request).scan_state
     with scan_state.lock:
         return {
             "running": scan_state.running,
@@ -380,15 +496,15 @@ def get_scan_status() -> dict[str, Any]:
         }
 
 
-def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None:
-    global scan_state
-
-    handler = QueueLogHandler(scan_state)
+def run_scan_thread(
+    scan_state: ScanState, config_path: Path, output_dir: Path, targets_to_scan: list[str], options: dict[str, Any]
+) -> None:
+    handler = QueueLogHandler(scan_state, threading.get_ident())
     logger.addHandler(handler)
 
     logger.info("Web scan run initiated. Targets: %s", ", ".join(targets_to_scan))
     try:
-        all_targets = load_targets(CONFIG_PATH_GLOBAL)
+        all_targets = load_targets(config_path)
         selected_targets = [t for t in all_targets if t.name in targets_to_scan]
         if not selected_targets:
             raise ValueError("No matching targets found to scan")
@@ -400,8 +516,6 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
         opencode_summary = options.get("opencode_summary", False) or bool(os.environ.get("OPENCODE_API_KEY"))
         rate_limit = options.get("rate_limit", 4.0)
         max_enrich_dependencies = options.get("max_enrich_dependencies")
-
-        output_dir = Path(options.get("output_dir", str(OUTPUT_DIR_GLOBAL)))
 
         pipeline = Pipeline(
             offline=offline,
@@ -442,8 +556,9 @@ def run_scan_thread(targets_to_scan: list[str], options: dict[str, Any]) -> None
 
 
 @app.post("/api/scans/run")
-def start_scan(payload: dict[str, Any]) -> dict[str, str]:
-    global scan_state
+def start_scan(request: Request, payload: dict[str, Any]) -> dict[str, str]:
+    session = _session(request)
+    scan_state = session.scan_state
 
     with scan_state.lock:
         if scan_state.running:
@@ -453,19 +568,26 @@ def start_scan(payload: dict[str, Any]) -> dict[str, str]:
         if not targets_to_scan:
             raise HTTPException(status_code=400, detail="Must specify targets to scan")
 
+        options = payload.get("options", {})
         scan_state.running = True
         scan_state.targets = targets_to_scan
-        scan_state.options = payload.get("options", {})
+        scan_state.options = options
         scan_state.error = None
         scan_state.log_queue = queue.Queue()
 
-    threading.Thread(target=run_scan_thread, args=(targets_to_scan, scan_state.options), daemon=True).start()
+    threading.Thread(
+        target=run_scan_thread,
+        args=(scan_state, session.config_path, session.output_dir, targets_to_scan, options),
+        daemon=True,
+    ).start()
 
     return {"status": "started"}
 
 
 @app.get("/api/scans/stream-logs")
-def stream_logs() -> StreamingResponse:
+def stream_logs(request: Request) -> StreamingResponse:
+    scan_state = _session(request).scan_state
+
     async def log_generator() -> AsyncGenerator[str, None]:
         # Stream live logs only. Sending history caused duplicate lines when a log
         # was added to the queue while the initial history batch was still being
@@ -486,10 +608,21 @@ def stream_logs() -> StreamingResponse:
 
 
 @app.middleware("http")
-async def no_cache_static(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+async def session_and_cache(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    # Assign each visitor a private, cookie-keyed sandbox so their edits/scans/deletes
+    # never affect other visitors or the owner's baseline.
+    sid = request.cookies.get(SESSION_COOKIE)
+    is_new = not _valid_sid(sid)
+    if is_new:
+        sid = uuid.uuid4().hex
+    request.state.session_id = sid
+
+    response = await call_next(request)
+
+    if is_new:
+        response.set_cookie(SESSION_COOKIE, sid or "", max_age=SESSION_TTL, httponly=True, samesite="lax")
     # Force revalidation of static assets; otherwise browsers heuristically cache
     # app.js/graph-renderer.js and code fixes never reach an open dashboard tab.
-    response = await call_next(request)
     if not request.url.path.startswith("/api"):
         response.headers["Cache-Control"] = "no-cache"
     return response
@@ -507,15 +640,20 @@ else:
 
 
 def run_server(host: str, port: int, config_path: str) -> None:
-    global CONFIG_PATH_GLOBAL
+    global BASELINE_CONFIG
     p = Path(config_path)
     if p.is_absolute():
-        CONFIG_PATH_GLOBAL = p
+        BASELINE_CONFIG = p
     else:
         # Check if the path exists relative to the current working directory first,
         # otherwise resolve it relative to the PROJECT_ROOT.
         cwd_p = p.resolve()
-        CONFIG_PATH_GLOBAL = cwd_p if cwd_p.exists() else (PROJECT_ROOT / p).resolve()
+        BASELINE_CONFIG = cwd_p if cwd_p.exists() else (PROJECT_ROOT / p).resolve()
+
+    # Warm the shared demo reports in the background so the server starts listening
+    # immediately (health checks pass); a very early first visitor just waits on the
+    # same one-shot build via _seed_session.
+    threading.Thread(target=build_baseline, daemon=True).start()
 
     import uvicorn
 
