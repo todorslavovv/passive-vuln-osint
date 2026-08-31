@@ -4,38 +4,39 @@
    ========================================================================== */
 
 :root {
-    --bg-main: #0a0d14;
-    --bg-card: rgba(18, 22, 33, 0.75);
-    --bg-card-hover: rgba(26, 32, 48, 0.85);
-    --bg-sidebar: #07090e;
-    --border-color: rgba(38, 48, 72, 0.5);
-    --border-color-hover: rgba(0, 242, 254, 0.5);
-    
+    /* CYBER_OSINT surfaces (Material-derived dark palette) */
+    --bg-main: #10131a;
+    --bg-card: #151921;
+    --bg-card-hover: #1d2026;
+    --bg-sidebar: #0b0e14;
+    --border-color: #1e293b;
+    --border-color-hover: rgba(0, 245, 255, 0.5);
+
     /* Neon Colors & Gradients */
-    --accent-cyan: #00f2fe;
-    --accent-blue: #4facfe;
-    --grad-primary: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-    --grad-purple: linear-gradient(135deg, #b92b27 0%, #1565c0 100%);
-    
+    --accent-cyan: #00f5ff;
+    --accent-blue: #00dce5;
+    --grad-primary: linear-gradient(135deg, #00f5ff 0%, #00dce5 100%);
+    --grad-purple: linear-gradient(135deg, #00f5ff 0%, #a855f7 100%);
+
     /* Text */
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    
-    /* Status HSL Colors */
-    --color-critical: hsl(345, 100%, 55%);
-    --color-high: hsl(24, 100%, 55%);
-    --color-medium: hsl(45, 100%, 50%);
-    --color-low: hsl(150, 75%, 45%);
-    --color-info: hsl(195, 100%, 50%);
-    
+    --text-primary: #e1e2eb;
+    --text-secondary: #b9caca;
+    --text-muted: #94a3b8;
+
+    /* Severity Colors */
+    --color-critical: #ef4444;
+    --color-high: #f97316;
+    --color-medium: #f59e0b;
+    --color-low: #10b981;
+    --color-info: #00f5ff;
+
     /* Fonts */
-    --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', Courier, monospace;
-    
+
     /* Shadows */
-    --shadow-glow-cyan: 0 0 15px rgba(0, 242, 254, 0.25);
-    --shadow-glow-critical: 0 0 15px rgba(255, 8, 68, 0.35);
+    --shadow-glow-cyan: 0 0 15px rgba(0, 245, 255, 0.25);
+    --shadow-glow-critical: 0 0 15px rgba(239, 68, 68, 0.35);
     --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 }
 
@@ -82,24 +83,38 @@ body {
     padding-left: 8px;
 }
 
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+}
+
 .sidebar-header h2 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
+    letter-spacing: 0.3px;
+    color: var(--accent-cyan);
+}
+
+.logo-version {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
     letter-spacing: 0.5px;
-    background: var(--grad-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-muted);
+    margin-top: 3px;
 }
 
 .logo-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    background: rgba(0, 242, 254, 0.1);
-    border: 1px solid rgba(0, 242, 254, 0.2);
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    background: var(--accent-cyan);
+    border: 1px solid var(--accent-cyan);
+    border-radius: 6px;
+    flex-shrink: 0;
     box-shadow: var(--shadow-glow-cyan);
 }
 
@@ -385,10 +400,10 @@ body {
     justify-content: center;
 }
 
-.stat-icon.purple { background: rgba(185, 43, 39, 0.15); border: 1px solid rgba(185, 43, 39, 0.2); color: #ff5252; }
-.stat-icon.blue { background: rgba(79, 172, 254, 0.15); border: 1px solid rgba(79, 172, 254, 0.2); color: #4facfe; }
-.stat-icon.yellow { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.2); color: #f59e0b; }
-.stat-icon.red { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; }
+.stat-icon.purple { background: rgba(0, 245, 255, 0.12); border: 1px solid rgba(0, 245, 255, 0.25); color: var(--accent-cyan); }
+.stat-icon.blue { background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.25); color: #a855f7; }
+.stat-icon.yellow { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.2); color: var(--color-medium); }
+.stat-icon.red { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.2); color: var(--color-critical); }
 
 .stat-info h3 {
     font-size: 26px;
@@ -459,15 +474,19 @@ body {
 .badge-status.never { background-color: var(--text-muted); }
 
 .badge-sev {
-    padding: 3px 6px;
-    font-size: 11px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 3px;
 }
 
-.badge-sev.CRITICAL { background: rgba(255, 8, 68, 0.15); border: 1px solid var(--color-critical); color: var(--color-critical); box-shadow: 0 0 10px rgba(255, 8, 68, 0.1); }
-.badge-sev.HIGH { background: rgba(245, 158, 11, 0.15); border: 1px solid var(--color-high); color: var(--color-high); }
-.badge-sev.MEDIUM { background: rgba(234, 179, 8, 0.15); border: 1px solid var(--color-medium); color: var(--color-medium); }
-.badge-sev.LOW { background: rgba(16, 185, 129, 0.15); border: 1px solid var(--color-low); color: var(--color-low); }
-.badge-sev.UNKNOWN { background: rgba(100, 116, 139, 0.15); border: 1px solid var(--text-muted); color: var(--text-secondary); }
+.badge-sev.CRITICAL { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: var(--color-critical); }
+.badge-sev.HIGH { background: rgba(249, 115, 22, 0.15); border: 1px solid rgba(249, 115, 22, 0.4); color: var(--color-high); }
+.badge-sev.MEDIUM { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: var(--color-medium); }
+.badge-sev.LOW { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: var(--color-low); }
+.badge-sev.UNKNOWN { background: rgba(148, 163, 184, 0.15); border: 1px solid rgba(148, 163, 184, 0.35); color: var(--text-secondary); }
 
 /* Layout grids */
 .two-column-layout {
@@ -1043,7 +1062,7 @@ body {
 }
 
 .graph-node-count {
-    color: var(--accent-cyan, #00f2fe);
+    color: var(--accent-cyan, #00f5ff);
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
 }
