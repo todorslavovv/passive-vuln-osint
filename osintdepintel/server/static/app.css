@@ -1029,8 +1029,12 @@ body {
 }
 
 /* Graph subtab layout */
+/* Fill the visible report content area rather than a fixed viewport height, so
+   the canvas never overflows below the fold (which made auto-fit look off-centre). */
+#subtab-graph { height: 100%; }
 .graph-viewport-container {
-    height: calc(100vh - 300px);
+    height: 100%;
+    min-height: 320px;
     border: 1px solid var(--border-color);
     border-radius: 5px;
     overflow: hidden;
