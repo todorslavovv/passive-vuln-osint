@@ -1364,3 +1364,15 @@ input.cyb-input::placeholder, textarea.cyb-input::placeholder { color: var(--tex
 .stat-chip.purple { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
 .stat-chip.amber  { background: rgba(245, 158, 11, 0.15); color: var(--color-medium); }
 .stat-chip.red    { background: rgba(239, 68, 68, 0.15); color: var(--color-critical); }
+
+/* Dashboard targets table — the table itself is Tailwind-classed, so style the
+   JS-injected rows here (cells otherwise have no padding). */
+#dashboard-targets-table td {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    font-size: 14px;
+}
+#dashboard-targets-table tbody tr:last-child td { border-bottom: none; }
+#dashboard-targets-table tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+#dashboard-targets-table td .btn { margin-left: 8px; }
