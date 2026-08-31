@@ -125,10 +125,22 @@ class DependencyGraphRenderer {
             }
         });
 
-        this.fitToScreen();
-        this.startLoop();
-        // Always paint one frame immediately so something shows even if rAF is delayed
+        // Run the force layout to completion off-screen, then fit — so the graph
+        // appears already settled and centred instead of visibly animating and
+        // snapping into place.
+        this._presettle();
+        this._applyFit();
         this.draw();
+    }
+
+    // Advance the force simulation to rest without painting each frame.
+    _presettle(maxIter = 600) {
+        if (this.nodes.length <= 1) { this.settled = true; return; }
+        this.settled = false;
+        for (let i = 0; i < maxIter && !this.settled; i++) {
+            this.updatePhysics();
+        }
+        this.settled = true;
     }
 
     resize() {
@@ -192,12 +204,9 @@ class DependencyGraphRenderer {
     }
 
     fitToScreen() {
-        // Explicit fit (initial render / "Fit Graph" button). Also re-arm the
-        // one-shot auto-fit so the view re-centres once the layout settles.
-        if (this._applyFit()) {
-            this.needsFit = true;
-            this.settled = false;
-        }
+        // Re-centre the view on the current (already settled) node positions.
+        // Does not restart the simulation, so there is no visible movement.
+        this._applyFit();
     }
 
     updatePhysics() {
@@ -358,12 +367,6 @@ class DependencyGraphRenderer {
             if (!this.settled || this.draggedNode) {
                 requestAnimationFrame(tick);
             } else {
-                // Layout has settled — auto-fit once so the graph focuses on the
-                // nodes without needing a manual "Fit Graph" click.
-                if (this.needsFit) {
-                    this.needsFit = false;
-                    this._applyFit();
-                }
                 this.loopRunning = false;
             }
         };
