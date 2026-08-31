@@ -1,441 +1,319 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CYBER_OSINT — Supply Chain Intelligence</title>
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Style -->
-    <link rel="stylesheet" href="app.css">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CYBER_OSINT — Supply Chain Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: { extend: {
+    colors: {
+      "severity-high": "#F97316", "surface-tint": "#00dce5", "outline": "#849495",
+      "outline-variant": "#3a494a", "surface-alt": "#151921", "surface-dim": "#10131a",
+      "on-primary-container": "#006c71", "primary": "#e9feff", "on-surface-variant": "#b9caca",
+      "severity-medium": "#F59E0B", "primary-container": "#00f5ff", "severity-critical": "#EF4444",
+      "error": "#ffb4ab", "surface-container-highest": "#32353c", "text-muted": "#94A3B8",
+      "secondary": "#bcc7de", "primary-fixed-dim": "#00dce5", "on-surface": "#e1e2eb",
+      "on-primary": "#003739", "severity-low": "#10B981", "surface-container": "#1d2026",
+      "surface-container-low": "#191c22", "surface": "#10131a", "surface-container-lowest": "#0b0e14",
+      "surface-container-high": "#272a31", "surface-bright": "#363940", "border-subtle": "#1E293B",
+      "background": "#10131a", "on-background": "#e1e2eb", "primary-fixed": "#63f7ff",
+      "accent-purple": "#A855F7", "inverse-surface": "#e1e2eb"
+    },
+    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+    spacing: { "sidebar-width": "260px", "container-padding": "24px", "gutter": "16px" },
+    fontFamily: { "sans": ["Geist"], "mono": ["JetBrains Mono"] }
+  } }
+}
+</script>
+<link rel="stylesheet" href="app.css?v=20260901"/>
 </head>
-<body>
-    <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#003739" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                    </svg>
-                </div>
-                <div class="logo-text">
-                    <h2>CYBER_OSINT</h2>
-                    <span class="logo-version">V2.4.0-STABLE</span>
-                </div>
+<body class="font-sans antialiased flex h-screen w-screen overflow-hidden bg-background text-on-surface">
+
+<!-- SIDEBAR -->
+<nav class="fixed left-0 top-0 h-full w-[260px] flex flex-col bg-surface-alt border-r border-border-subtle z-50">
+  <div class="p-container-padding border-b border-border-subtle">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary-container">
+        <span class="material-symbols-outlined text-lg" style="font-variation-settings:'FILL' 1;">security</span>
+      </div>
+      <div>
+        <h1 class="text-[18px] font-bold text-primary-container tracking-tight leading-none">CYBER_OSINT</h1>
+        <p class="font-mono text-[10px] text-text-muted mt-1">V2.4.0-STABLE</p>
+      </div>
+    </div>
+  </div>
+  <div class="flex-1 py-4 px-3 space-y-1">
+    <button class="nav-btn active" data-tab="dashboard"><span class="material-symbols-outlined text-[20px]">dashboard</span><span>Dashboard</span></button>
+    <button class="nav-btn" data-tab="targets"><span class="material-symbols-outlined text-[20px]">target</span><span>Target Manager</span></button>
+    <button class="nav-btn" data-tab="scanner"><span class="material-symbols-outlined text-[20px]">rocket_launch</span><span>Scan Runner</span></button>
+    <button class="nav-btn" data-tab="reports"><span class="material-symbols-outlined text-[20px]">analytics</span><span>Report Explorer</span></button>
+  </div>
+  <div class="p-4 border-t border-border-subtle">
+    <div class="flex items-center gap-2 px-2 text-text-muted text-[13px]">
+      <span class="status-dot idle" id="global-status-dot"></span>
+      <span id="global-status-text">System Idle</span>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="ml-[260px] w-[calc(100%-260px)] h-screen flex flex-col">
+  <!-- HEADER -->
+  <header class="flex justify-between items-center h-16 w-full px-container-padding bg-surface-dim border-b border-border-subtle shrink-0 z-40">
+    <div>
+      <h1 id="page-title" class="text-[22px] font-black tracking-tight text-on-surface leading-tight">Dashboard Overview</h1>
+      <p id="page-subtitle" class="text-[12px] text-text-muted">OSINT supply chain vulnerabilities tracking</p>
+    </div>
+    <button id="refresh-data-btn" class="flex items-center gap-2 px-4 py-1.5 rounded bg-primary-container text-on-primary font-semibold text-[14px] hover:bg-primary-fixed transition-colors">
+      <span class="material-symbols-outlined text-[16px]">sync</span> Sync
+    </button>
+  </header>
+
+  <div class="flex-1 overflow-y-auto p-container-padding">
+
+    <!-- ===== TAB: DASHBOARD ===== -->
+    <section id="tab-dashboard" class="tab-pane active">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+        <div class="cyb-card p-5 flex items-center gap-4">
+          <div class="stat-chip cyan"><span class="material-symbols-outlined">target</span></div>
+          <div><div class="text-[26px] font-bold leading-none" id="stat-targets-count">0</div><div class="text-[11px] uppercase tracking-wider text-text-muted mt-1">Configured Targets</div></div>
+        </div>
+        <div class="cyb-card p-5 flex items-center gap-4">
+          <div class="stat-chip purple"><span class="material-symbols-outlined">account_tree</span></div>
+          <div><div class="text-[26px] font-bold leading-none" id="stat-deps-count">0</div><div class="text-[11px] uppercase tracking-wider text-text-muted mt-1">Dependencies Map</div></div>
+        </div>
+        <div class="cyb-card p-5 flex items-center gap-4">
+          <div class="stat-chip amber"><span class="material-symbols-outlined">warning</span></div>
+          <div><div class="text-[26px] font-bold leading-none" id="stat-vulns-count">0</div><div class="text-[11px] uppercase tracking-wider text-text-muted mt-1">Advisory Vulnerabilities</div></div>
+        </div>
+        <div class="cyb-card p-5 flex items-center gap-4">
+          <div class="stat-chip red"><span class="material-symbols-outlined">crisis_alert</span></div>
+          <div><div class="text-[26px] font-bold leading-none" id="stat-findings-count">0</div><div class="text-[11px] uppercase tracking-wider text-text-muted mt-1">Risk Findings</div></div>
+        </div>
+      </div>
+
+      <div class="cyb-card mt-gutter overflow-hidden">
+        <div class="px-6 py-4 border-b border-border-subtle"><h2 class="text-[16px] font-semibold">Targets Scan Overview</h2></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse" id="dashboard-targets-table">
+            <thead><tr class="border-b border-border-subtle bg-surface-dim/40">
+              <th class="px-6 py-3 text-[11px] uppercase tracking-wider text-text-muted font-normal">Target Name</th>
+              <th class="px-6 py-3 text-[11px] uppercase tracking-wider text-text-muted font-normal">Target URL</th>
+              <th class="px-6 py-3 text-[11px] uppercase tracking-wider text-text-muted font-normal">Scan Status</th>
+              <th class="px-6 py-3 text-[11px] uppercase tracking-wider text-text-muted font-normal text-right">Actions</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: TARGETS ===== -->
+    <section id="tab-targets" class="tab-pane">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter items-start">
+        <div class="cyb-card">
+          <div class="px-6 py-4 border-b border-border-subtle flex justify-between items-center">
+            <h2 class="text-[16px] font-semibold">Configured Targets</h2>
+            <button id="add-target-btn" class="btn-primary-sm"><span class="material-symbols-outlined text-[16px]">add</span> Add Target</button>
+          </div>
+          <div class="p-4 max-h-[600px] overflow-y-auto" id="targets-list-container"></div>
+        </div>
+
+        <div class="cyb-card" id="target-form-card" style="display:none;">
+          <div class="px-6 py-4 border-b border-border-subtle"><h2 class="text-[16px] font-semibold" id="target-form-title">Target Configuration</h2></div>
+          <div class="p-6">
+            <form id="target-form">
+              <label class="block text-[11px] uppercase tracking-wider text-text-muted mb-2" for="target-url">Website or GitHub URL *</label>
+              <input id="target-url" type="text" required placeholder="https://example.com or https://github.com/user/repo" class="cyb-input w-full">
+              <div class="flex justify-end gap-3 mt-6">
+                <button type="button" id="cancel-target-form" class="btn-ghost">Cancel</button>
+                <button type="submit" id="save-target-form" class="btn-primary">Save Target</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="cyb-card flex items-center justify-center text-center min-h-[300px]" id="target-form-placeholder">
+          <div class="p-10">
+            <span class="material-symbols-outlined text-[48px] text-border-subtle">help</span>
+            <h3 class="mt-4 text-[16px] font-semibold">No Target Selected</h3>
+            <p class="text-text-muted text-[13px] mt-2 max-w-[300px] mx-auto">Click "Add Target" or select an existing target from the list to view or edit its configuration.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: SCANNER ===== -->
+    <section id="tab-scanner" class="tab-pane">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter items-stretch h-[calc(100vh-160px)]">
+        <div class="cyb-card flex flex-col overflow-hidden">
+          <div class="px-6 py-4 border-b border-border-subtle"><h2 class="text-[16px] font-semibold">Launch Supply Chain Discovery</h2></div>
+          <div class="p-6 overflow-y-auto space-y-5">
+            <div>
+              <label class="block text-[11px] uppercase tracking-wider text-text-muted mb-2">Select Target to Analyze</label>
+              <div class="cyb-inset max-h-[190px] overflow-y-auto p-1" id="scanner-targets-container"></div>
             </div>
-            
-            <nav class="nav-links">
-                <button class="nav-btn active" data-tab="dashboard">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
-                    <span>Dashboard</span>
-                </button>
-                <button class="nav-btn" data-tab="targets">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M12 6v12"></path><path d="M6 12h12"></path></svg>
-                    <span>Target Manager</span>
-                </button>
-                <button class="nav-btn" data-tab="scanner">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                    <span>Scan Runner</span>
-                </button>
-                <button class="nav-btn" data-tab="reports">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                    <span>Report Explorer</span>
-                </button>
-            </nav>
-            
-            <div class="sidebar-footer">
-                <div class="status-indicator-container">
-                    <div class="status-dot idle" id="global-status-dot"></div>
-                    <span id="global-status-text">System Idle</span>
-                </div>
+            <div class="h-px bg-border-subtle"></div>
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" id="scan-opt-offline" checked class="cyb-check mt-0.5">
+              <span class="text-[13px]"><strong>Offline Mode</strong> <span class="text-text-muted">(Fast, reliable demo data. Uncheck for a live scan — slower, and public targets may be down.)</span></span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" id="scan-opt-skip-nvd" class="cyb-check mt-0.5">
+              <span class="text-[13px]"><strong>Bypass NVD Enrichment</strong> <span class="text-text-muted">(Skip live NVD, use other providers)</span></span>
+            </label>
+            <p class="text-[12px] text-text-muted leading-relaxed">A plain-language <strong class="text-on-surface">AI summary</strong> is generated automatically for each scan when the server is configured with an OpenCode key — no setup needed.</p>
+            <div>
+              <label class="block text-[13px] mb-2" for="scan-opt-rate-limit">HTTP Rate Limit (requests/second): <span id="rate-limit-val" class="text-primary-container font-mono">4.0</span></label>
+              <input type="range" id="scan-opt-rate-limit" min="1" max="20" step="0.5" value="4.0" class="w-full">
             </div>
+            <div>
+              <label class="block text-[13px] mb-2" for="scan-opt-max-deps">Enrichment Dependency Limit (blank for no cap)</label>
+              <input type="number" id="scan-opt-max-deps" min="1" placeholder="e.g. 50" class="cyb-input w-full">
+            </div>
+            <button id="start-scan-btn" class="btn-primary w-full justify-center py-3 text-[15px]">
+              <span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1;">play_arrow</span> Launch Scan Engine
+            </button>
+          </div>
+        </div>
+
+        <div class="cyb-card flex flex-col overflow-hidden">
+          <div class="px-6 py-4 border-b border-border-subtle flex justify-between items-center">
+            <h2 class="text-[16px] font-semibold">Real-time Pipeline Stream</h2>
+            <button id="clear-console-btn" class="btn-ghost text-[12px] py-1">Clear Logs</button>
+          </div>
+          <div class="terminal-container flex-1" id="terminal-output">
+            <div class="terminal-line text-text-muted">Ready to launch scans. Log messages will stream here.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TAB: REPORTS ===== -->
+    <section id="tab-reports" class="tab-pane">
+      <div class="flex gap-gutter h-[calc(100vh-160px)]">
+        <aside class="w-[340px] shrink-0 cyb-card flex flex-col overflow-hidden">
+          <div class="p-3 border-b border-border-subtle">
+            <input type="text" id="report-search-input" placeholder="Search reports..." class="cyb-input w-full">
+          </div>
+          <div class="flex-1 overflow-y-auto p-3 space-y-2" id="reports-list-container"></div>
         </aside>
 
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <!-- HEADER -->
-            <header class="main-header">
-                <div class="header-title">
-                    <h1 id="page-title">Dashboard Overview</h1>
-                    <p id="page-subtitle" class="text-muted">OSINT supply chain vulnerabilities tracking</p>
+        <div class="flex-1 cyb-card flex flex-col overflow-hidden" id="report-details-panel" style="display:none;">
+          <div class="px-6 py-4 border-b border-border-subtle flex justify-between items-start gap-4 flex-wrap">
+            <div>
+              <h2 class="text-[18px] font-bold" id="report-active-title">Target</h2>
+              <span class="text-[12px] text-text-muted" id="report-active-time"></span>
+              <div class="ai-summary-flags mt-1.5" id="ai-summary-flags"><span class="ai-flag ai-flag-none">No AI summary</span></div>
+            </div>
+            <div class="flex flex-wrap gap-2 items-start" id="report-artifacts-container">
+              <button id="view-raw-json-btn" class="btn-ghost text-[12px] py-1">Raw JSON</button>
+            </div>
+          </div>
+
+          <div class="flex border-b border-border-subtle px-4">
+            <button class="sub-tab-btn active" data-subtab="overview">Overview</button>
+            <button class="sub-tab-btn" data-subtab="findings">Vulnerabilities &amp; Findings</button>
+            <button class="sub-tab-btn" data-subtab="graph">Dependency Graph</button>
+            <button class="sub-tab-btn" id="opencode-summary-subtab" data-subtab="opencode-summary" style="display:none;">AI Summary</button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- OVERVIEW -->
+            <div class="sub-tab-pane active" id="subtab-overview">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+                <div class="cyb-inset p-4"><div class="text-[11px] uppercase tracking-wider text-text-muted">Total Dependencies</div><div class="text-[28px] font-bold mt-1" id="ro-deps-count">0</div><div class="text-[12px] text-text-muted" id="ro-deps-confirmed-inferred">0 confirmed, 0 inferred</div></div>
+                <div class="cyb-inset p-4"><div class="text-[11px] uppercase tracking-wider text-text-muted">Vulnerability Count</div><div class="text-[28px] font-bold mt-1 text-severity-critical" id="ro-vulns-count">0</div><div class="text-[12px] text-text-muted" id="ro-vulns-finding-count">Linked to 0 ranked findings</div></div>
+                <div class="cyb-inset p-4"><div class="text-[11px] uppercase tracking-wider text-text-muted">Confidence Floor</div><div class="text-[28px] font-bold mt-1 text-severity-low" id="ro-confidence-floor">1.0</div><div class="text-[12px] text-text-muted">Lowest value resolved</div></div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter mt-gutter">
+                <div class="cyb-inset p-4"><h3 class="text-[14px] font-semibold mb-3">Source Coverage</h3><div class="data-tag-container" id="ro-sources-container"></div></div>
+                <div class="cyb-inset p-4"><h3 class="text-[14px] font-semibold mb-3">Confidence Distribution</h3><div class="progress-list" id="ro-confidence-distribution"></div></div>
+              </div>
+              <div class="cyb-inset p-4 mt-gutter">
+                <h3 class="text-[14px] font-semibold mb-3">Passive Collection Gaps &amp; Conflicts</h3>
+                <h4 class="text-[12px] uppercase tracking-wider text-text-muted mb-2">Gaps</h4>
+                <div class="gaps-list" id="ro-gaps-container"></div>
+                <h4 class="text-[12px] uppercase tracking-wider text-text-muted mb-2 mt-4">Conflicts</h4>
+                <div class="conflicts-list" id="ro-conflicts-container"></div>
+              </div>
+            </div>
+
+            <!-- FINDINGS -->
+            <div class="sub-tab-pane" id="subtab-findings">
+              <div class="flex gap-3 mb-4 flex-wrap">
+                <input type="text" id="findings-search" placeholder="Search vulnerability/package..." class="cyb-input flex-1 min-w-[200px]">
+                <select id="findings-severity-filter" class="cyb-input">
+                  <option value="">All Severities</option>
+                  <option value="CRITICAL">Critical</option>
+                  <option value="HIGH">High</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="LOW">Low</option>
+                </select>
+              </div>
+              <div class="findings-list-group" id="ro-findings-list"></div>
+            </div>
+
+            <!-- GRAPH -->
+            <div class="sub-tab-pane" id="subtab-graph">
+              <div class="graph-viewport-container">
+                <div class="graph-instructions">
+                  <span>Click node · drag · pan bg · scroll zoom</span>
+                  <span id="graph-node-count" class="graph-node-count">0 nodes</span>
+                  <button class="btn-ghost text-[12px] py-1" id="graph-reset-btn">Fit Graph</button>
                 </div>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" id="refresh-data-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
-                        <span>Sync</span>
-                    </button>
-                </div>
-            </header>
-
-            <!-- TABS -->
-            <div class="tab-content-container">
-                <!-- TAB: DASHBOARD -->
-                <section id="tab-dashboard" class="tab-pane active">
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon purple">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
-                            </div>
-                            <div class="stat-info">
-                                <h3 id="stat-targets-count">0</h3>
-                                <p>Configured Targets</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon blue">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-                            </div>
-                            <div class="stat-info">
-                                <h3 id="stat-deps-count">0</h3>
-                                <p>Dependencies Map</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon yellow">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                            </div>
-                            <div class="stat-info">
-                                <h3 id="stat-vulns-count">0</h3>
-                                <p>Advisory Vulnerabilities</p>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon red">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                            </div>
-                            <div class="stat-info">
-                                <h3 id="stat-findings-count">0</h3>
-                                <p>Risk Findings</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card margin-top">
-                        <div class="card-header">
-                            <h2>Targets Scan Overview</h2>
-                        </div>
-                        <div class="card-body no-padding">
-                            <table class="table" id="dashboard-targets-table">
-                                <thead>
-                                    <tr>
-                                        <th>Target Name</th>
-                                        <th>Target URL</th>
-                                        <th>Scan Status</th>
-                                        <th class="text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Dynamic content -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- TAB: TARGETS -->
-                <section id="tab-targets" class="tab-pane">
-                    <div class="two-column-layout">
-                        <!-- Targets list -->
-                        <div class="card">
-                            <div class="card-header flex-between">
-                                <h2>Configured Targets</h2>
-                                <button class="btn btn-sm btn-primary" id="add-target-btn">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                                    <span>Add Target</span>
-                                </button>
-                            </div>
-                            <div class="card-body no-padding scroll-container max-height-600">
-                                <div class="targets-list-group" id="targets-list-container">
-                                    <!-- Dynamic list items -->
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Target Form -->
-                        <div class="card" id="target-form-card" style="display: none;">
-                            <div class="card-header">
-                                <h2 id="target-form-title">Target Configurations</h2>
-                            </div>
-                            <div class="card-body">
-                                <form id="target-form">
-                                    <div class="form-group">
-                                        <label for="target-url">Website or GitHub URL *</label>
-                                        <input type="text" id="target-url" required placeholder="e.g. https://example.com or https://github.com/user/repo">
-                                    </div>
-                                    
-                                    <div class="form-actions">
-                                        <button type="button" class="btn btn-secondary" id="cancel-target-form">Cancel</button>
-                                        <button type="submit" class="btn btn-primary" id="save-target-form">Save Target</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-
-                        <!-- Target selection help -->
-                        <div class="card flex-center text-center" id="target-form-placeholder">
-                            <div class="card-body padded">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border-color)" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                                <h3 class="margin-top">No Target Selected</h3>
-                                <p class="text-muted max-width-300 margin-top-sm">Click "Add Target" or select an existing target from the left list to view or edit configurations.</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- TAB: SCANNER -->
-                <section id="tab-scanner" class="tab-pane">
-                    <div class="two-column-layout">
-                        <!-- Setup panel -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>Launch Supply Chain Discovery</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="form-group">
-                                    <label>Select Target to Analyze</label>
-                                    <div class="target-checkboxes-container" id="scanner-targets-container">
-                                        <!-- Dynamic target list radio buttons -->
-                                    </div>
-                                </div>
-
-                                <div class="divider"></div>
-
-                                <div class="form-group">
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="scan-opt-offline" checked>
-                                        <span><strong>Offline Mode</strong> (Fast, reliable demo data. Uncheck for a live scan — slower, and public targets may be down.)</span>
-                                    </label>
-                                </div>
-                                <div class="form-group">
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" id="scan-opt-skip-nvd">
-                                        <span><strong>Bypass NVD Enrichment</strong> (Skip live NVD, use other providers)</span>
-                                    </label>
-                                </div>
-                                <div class="form-group">
-                                    <p class="hint-text">A plain-language <strong>AI summary</strong> is generated automatically for each scan when the server is configured with an OpenCode key — no setup needed.</p>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="scan-opt-rate-limit">HTTP Rate Limit (requests/second): <span id="rate-limit-val">4.0</span></label>
-                                    <input type="range" id="scan-opt-rate-limit" min="1" max="20" step="0.5" value="4.0">
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="scan-opt-max-deps">Enrichment Dependency Limit (blank for no cap)</label>
-                                    <input type="number" id="scan-opt-max-deps" min="1" placeholder="e.g. 50">
-                                </div>
-
-                                <button class="btn btn-primary btn-block btn-lg margin-top" id="start-scan-btn">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                    <span>Launch Scan Engine</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Console stream output -->
-                        <div class="card flex-grow-2">
-                            <div class="card-header flex-between">
-                                <h2>Real-time Pipeline Stream</h2>
-                                <button class="btn btn-sm btn-secondary" id="clear-console-btn">Clear Logs</button>
-                            </div>
-                            <div class="card-body no-padding flex-column-container">
-                                <div class="terminal-container" id="terminal-output">
-                                    <div class="terminal-line text-muted">Ready to launch scans. Log messages will stream here.</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- TAB: REPORTS -->
-                <section id="tab-reports" class="tab-pane">
-                    <div class="reports-layout">
-                        <!-- Left pane: Reports list -->
-                        <aside class="reports-sidebar">
-                            <div class="sidebar-search">
-                                <input type="text" id="report-search-input" placeholder="Search reports...">
-                            </div>
-                            <div class="reports-list-container" id="reports-list-container">
-                                <!-- Dynamic reports list -->
-                            </div>
-                        </aside>
-
-                        <!-- Right pane: Report Details -->
-                        <div class="report-details-container" id="report-details-panel" style="display: none;">
-                            <div class="report-details-header">
-                                <div class="report-title-info">
-                                    <h2 id="report-active-title">Target: Juice-shop</h2>
-                                    <span class="report-timestamp" id="report-active-time">Generated: 2026-07-16 10:00</span>
-                                    <div class="ai-summary-flags" id="ai-summary-flags">
-                                        <span class="ai-flag ai-flag-none">No AI summary</span>
-                                    </div>
-                                </div>
-                                <div class="report-sub-actions" id="report-artifacts-container">
-                                    <button class="btn btn-sm btn-secondary" id="view-raw-json-btn">Raw JSON</button>
-                                </div>
-                            </div>
-
-                            <!-- Report Inner Tabs -->
-                            <div class="report-sub-tabs">
-                                <button class="sub-tab-btn active" data-subtab="overview">Overview</button>
-                                <button class="sub-tab-btn" data-subtab="findings">Vulnerabilities & Findings</button>
-                                <button class="sub-tab-btn" data-subtab="graph">Dependency Graph</button>
-                                <button class="sub-tab-btn" id="opencode-summary-subtab" data-subtab="opencode-summary" style="display: none;">AI Summary</button>
-                            </div>
-
-                            <div class="report-sub-content">
-                                <!-- SUBTAB: OVERVIEW -->
-                                <div class="sub-tab-pane active" id="subtab-overview">
-                                    <div class="grid-3-col">
-                                        <div class="metric-card">
-                                            <span class="metric-title">Total Dependencies</span>
-                                            <span class="metric-value" id="ro-deps-count">0</span>
-                                            <span class="metric-sub" id="ro-deps-confirmed-inferred">0 confirmed, 0 inferred</span>
-                                        </div>
-                                        <div class="metric-card">
-                                            <span class="metric-title">Vulnerability Count</span>
-                                            <span class="metric-value" id="ro-vulns-count">0</span>
-                                            <span class="metric-sub" id="ro-vulns-finding-count">Linked to 0 risk findings</span>
-                                        </div>
-                                        <div class="metric-card font-green">
-                                            <span class="metric-title">Confidence Floor</span>
-                                            <span class="metric-value" id="ro-confidence-floor">1.0</span>
-                                            <span class="metric-sub">Lowest value resolved</span>
-                                        </div>
-                                    </div>
-
-                                    <div class="grid-2-col margin-top">
-                                        <!-- Source coverage -->
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h3>Source Coverage</h3>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="data-tag-container" id="ro-sources-container">
-                                                    <!-- Dynamic source tags -->
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <!-- Confidence Distribution -->
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h3>Confidence Distribution</h3>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="progress-list" id="ro-confidence-distribution">
-                                                    <!-- Dynamic progress list -->
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Collection Gaps & Conflicts -->
-                                    <div class="card margin-top">
-                                        <div class="card-header">
-                                            <h3>Passive Collection Gaps & Conflicts</h3>
-                                        </div>
-                                        <div class="card-body">
-                                            <h4>Gaps</h4>
-                                            <div class="gaps-list" id="ro-gaps-container">
-                                                <!-- Dynamic collection gaps -->
-                                            </div>
-                                            <h4 class="margin-top">Conflicts</h4>
-                                            <div class="conflicts-list" id="ro-conflicts-container">
-                                                <!-- Dynamic conflicts -->
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- SUBTAB: FINDINGS -->
-                                <div class="sub-tab-pane" id="subtab-findings">
-                                    <div class="findings-filter-bar">
-                                        <div class="filter-group">
-                                            <input type="text" id="findings-search" placeholder="Search vulnerability/package...">
-                                        </div>
-                                        <div class="filter-group">
-                                            <select id="findings-severity-filter">
-                                                <option value="">All Severities</option>
-                                                <option value="CRITICAL">Critical</option>
-                                                <option value="HIGH">High</option>
-                                                <option value="MEDIUM">Medium</option>
-                                                <option value="LOW">Low</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div class="findings-list-group" id="ro-findings-list">
-                                        <!-- Dynamic findings -->
-                                    </div>
-                                </div>
-
-                                <!-- SUBTAB: GRAPH -->
-                                <div class="sub-tab-pane" id="subtab-graph">
-                                    <div class="graph-viewport-container">
-                                        <div class="graph-instructions">
-                                            <span>Click node · drag · pan bg · scroll zoom</span>
-                                            <span id="graph-node-count" class="graph-node-count">0 nodes</span>
-                                            <button class="btn btn-xs btn-secondary" id="graph-reset-btn">Fit Graph</button>
-                                        </div>
-                                        <canvas id="dependency-graph-canvas"></canvas>
-                                    </div>
-                                </div>
-
-                                <!-- SUBTAB: AI (OPENCODE) SUMMARY -->
-                                <div class="sub-tab-pane" id="subtab-opencode-summary">
-                                    <div class="ai-summary-container" id="ro-opencode-summary-text">
-                                        <!-- Rendered AI text explanation -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Report details placeholder -->
-                        <div class="card flex-center text-center flex-grow-1" id="report-details-placeholder">
-                            <div class="card-body padded">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--border-color)" stroke-width="1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                                <h3 class="margin-top">No Report Loaded</h3>
-                                <p class="text-muted max-width-300 margin-top-sm">Select an available report from the left sidebar to visualize dependencies, vulnerabilities, and confidence scores.</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                <canvas id="dependency-graph-canvas"></canvas>
+              </div>
             </div>
-        </main>
-    </div>
 
-    <!-- Slide-out Side Drawer for Node Details -->
-    <div class="drawer" id="node-details-drawer">
-        <div class="drawer-header flex-between">
-            <h3>Dependency Details</h3>
-            <button class="drawer-close-btn" id="close-drawer-btn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        </div>
-        <div class="drawer-body" id="node-details-body">
-            <!-- Dynamic dependency information -->
-        </div>
-    </div>
-    
-    <!-- Modal: Raw JSON viewer -->
-    <div class="modal-backdrop" id="json-modal" style="display: none;">
-        <div class="modal">
-            <div class="modal-header flex-between">
-                <h3>Raw Report JSON</h3>
-                <button class="btn-icon" id="close-json-modal-btn">×</button>
+            <!-- AI SUMMARY -->
+            <div class="sub-tab-pane" id="subtab-opencode-summary">
+              <div class="ai-summary-container" id="ro-opencode-summary-text"></div>
             </div>
-            <div class="modal-body">
-                <pre><code id="json-raw-content"></code></pre>
-            </div>
+          </div>
         </div>
-    </div>
 
-    <!-- Scripts -->
-    <script src="graph-renderer.js?v=20260724b"></script>
-    <script src="app.js?v=20260724b"></script>
+        <div class="flex-1 cyb-card flex items-center justify-center text-center" id="report-details-placeholder">
+          <div class="p-10">
+            <span class="material-symbols-outlined text-[64px] text-border-subtle">description</span>
+            <h3 class="mt-4 text-[16px] font-semibold">No Report Loaded</h3>
+            <p class="text-text-muted text-[13px] mt-2 max-w-[300px] mx-auto">Select a report from the left to visualize dependencies, vulnerabilities, and confidence scores.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- DRAWER: node details -->
+<div class="drawer" id="node-details-drawer">
+  <div class="drawer-header flex-between">
+    <h3>Dependency Details</h3>
+    <button class="drawer-close-btn" id="close-drawer-btn"><span class="material-symbols-outlined">close</span></button>
+  </div>
+  <div class="drawer-body" id="node-details-body"></div>
+</div>
+
+<!-- MODAL: raw JSON -->
+<div class="modal-backdrop" id="json-modal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header flex-between">
+      <h3>Raw Report JSON</h3>
+      <button class="btn-icon" id="close-json-modal-btn">×</button>
+    </div>
+    <div class="modal-body"><pre><code id="json-raw-content"></code></pre></div>
+  </div>
+</div>
+
+<script src="graph-renderer.js?v=20260901"></script>
+<script src="app.js?v=20260901"></script>
 </body>
 </html>
