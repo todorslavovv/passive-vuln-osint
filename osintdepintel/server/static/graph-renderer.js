@@ -25,6 +25,7 @@ class DependencyGraphRenderer {
         this.lastMouseY = 0;
         this.loopRunning = false;
         this.settled = false;
+        this.needsFit = false;
 
         this.repulsionConstant = 4000;
         this.springConstant = 0.08;
@@ -159,10 +160,13 @@ class DependencyGraphRenderer {
         if (this.nodes.length) this.draw();
     }
 
-    fitToScreen() {
-        if (!this.nodes.length) return;
+    // Compute pan/zoom to frame all nodes and repaint. Does NOT touch `settled`,
+    // so it can be used both for an explicit fit and for a one-shot fit once the
+    // force layout has settled (see startLoop).
+    _applyFit() {
+        if (!this.nodes.length) return false;
         const { w: viewW, h: viewH } = this._viewSize();
-        if (viewW < 10 || viewH < 10) return;
+        if (viewW < 10 || viewH < 10) return false;
 
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         this.nodes.forEach(node => {
@@ -183,8 +187,17 @@ class DependencyGraphRenderer {
         const midY = (minY + maxY) / 2;
         this.panX = viewW / 2 - midX * this.zoom;
         this.panY = viewH / 2 - midY * this.zoom;
-        this.settled = false;
         this.draw();
+        return true;
+    }
+
+    fitToScreen() {
+        // Explicit fit (initial render / "Fit Graph" button). Also re-arm the
+        // one-shot auto-fit so the view re-centres once the layout settles.
+        if (this._applyFit()) {
+            this.needsFit = true;
+            this.settled = false;
+        }
     }
 
     updatePhysics() {
@@ -345,6 +358,12 @@ class DependencyGraphRenderer {
             if (!this.settled || this.draggedNode) {
                 requestAnimationFrame(tick);
             } else {
+                // Layout has settled — auto-fit once so the graph focuses on the
+                // nodes without needing a manual "Fit Graph" click.
+                if (this.needsFit) {
+                    this.needsFit = false;
+                    this._applyFit();
+                }
                 this.loopRunning = false;
             }
         };
