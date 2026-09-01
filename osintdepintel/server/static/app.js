@@ -176,8 +176,26 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.navButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             switchTab(btn.getAttribute('data-tab'));
+            closeMobileSidebar();
         });
     });
+
+    // Mobile off-canvas sidebar toggle (hamburger + backdrop). No-op on desktop
+    // where the sidebar is always visible.
+    const sidebarEl = document.getElementById('app-sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+    function closeMobileSidebar() {
+        sidebarEl.classList.remove('open');
+        sidebarBackdrop.classList.remove('open');
+    }
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+            const open = sidebarEl.classList.toggle('open');
+            sidebarBackdrop.classList.toggle('open', open);
+        });
+        sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+    }
 
     // ==========================================================================
     // DATA SYNC & LOADING
