@@ -32,12 +32,13 @@ tailwind.config = {
   } }
 }
 </script>
-<link rel="stylesheet" href="app.css?v=20260904"/>
+<link rel="stylesheet" href="app.css?v=20260906"/>
 </head>
 <body class="font-sans antialiased flex h-screen w-screen overflow-hidden bg-background text-on-surface">
 
 <!-- SIDEBAR -->
-<nav class="fixed left-0 top-0 h-full w-[260px] flex flex-col bg-surface-alt border-r border-border-subtle z-50">
+<div id="sidebar-backdrop"></div>
+<nav id="app-sidebar" class="fixed left-0 top-0 h-full w-[260px] flex flex-col bg-surface-alt border-r border-border-subtle z-50">
   <div class="p-container-padding border-b border-border-subtle">
     <div class="flex items-center gap-3">
       <div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary-container">
@@ -64,14 +65,17 @@ tailwind.config = {
 </nav>
 
 <!-- MAIN -->
-<div class="ml-[260px] w-[calc(100%-260px)] h-screen flex flex-col">
+<div id="app-main" class="ml-[260px] w-[calc(100%-260px)] h-screen flex flex-col">
   <!-- HEADER -->
   <header class="flex justify-between items-center h-16 w-full px-container-padding bg-surface-dim border-b border-border-subtle shrink-0 z-40">
-    <div>
-      <h1 id="page-title" class="text-[22px] font-black tracking-tight text-on-surface leading-tight">Dashboard Overview</h1>
-      <p id="page-subtitle" class="text-[12px] text-text-muted">OSINT supply chain vulnerabilities tracking</p>
+    <div class="flex items-center gap-3 min-w-0">
+      <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Open menu"><span class="material-symbols-outlined">menu</span></button>
+      <div class="min-w-0">
+        <h1 id="page-title" class="text-[22px] font-black tracking-tight text-on-surface leading-tight truncate">Dashboard Overview</h1>
+        <p id="page-subtitle" class="text-[12px] text-text-muted truncate">OSINT supply chain vulnerabilities tracking</p>
+      </div>
     </div>
-    <button id="refresh-data-btn" class="flex items-center gap-2 px-4 py-1.5 rounded bg-primary-container text-on-primary font-semibold text-[14px] hover:bg-primary-fixed transition-colors">
+    <button id="refresh-data-btn" class="flex items-center gap-2 px-4 py-1.5 rounded bg-primary-container text-on-primary font-semibold text-[14px] hover:bg-primary-fixed transition-colors shrink-0">
       <span class="material-symbols-outlined text-[16px]">sync</span> Sync
     </button>
   </header>
@@ -152,7 +156,7 @@ tailwind.config = {
 
     <!-- ===== TAB: SCANNER ===== -->
     <section id="tab-scanner" class="tab-pane">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter items-stretch h-[calc(100vh-160px)]">
+      <div id="scanner-layout" class="grid grid-cols-1 lg:grid-cols-2 gap-gutter items-stretch h-[calc(100vh-160px)]">
         <div class="cyb-card flex flex-col overflow-hidden">
           <div class="px-6 py-4 border-b border-border-subtle"><h2 class="text-[16px] font-semibold">Launch Supply Chain Discovery</h2></div>
           <div class="p-6 overflow-y-auto flex flex-col gap-5">
@@ -190,8 +194,8 @@ tailwind.config = {
 
     <!-- ===== TAB: REPORTS ===== -->
     <section id="tab-reports" class="tab-pane">
-      <div class="flex gap-gutter h-[calc(100vh-160px)]">
-        <aside class="w-[340px] shrink-0 cyb-card flex flex-col overflow-hidden">
+      <div id="reports-layout" class="flex gap-gutter h-[calc(100vh-160px)]">
+        <aside id="reports-aside" class="w-[340px] shrink-0 cyb-card flex flex-col overflow-hidden">
           <div class="p-3 border-b border-border-subtle">
             <input type="text" id="report-search-input" placeholder="Search reports..." class="cyb-input w-full">
           </div>
@@ -210,7 +214,7 @@ tailwind.config = {
             </div>
           </div>
 
-          <div class="flex border-b border-border-subtle px-4">
+          <div id="report-subtabs" class="flex border-b border-border-subtle px-4">
             <button class="sub-tab-btn active" data-subtab="overview">Overview</button>
             <button class="sub-tab-btn" data-subtab="findings">Vulnerabilities &amp; Findings</button>
             <button class="sub-tab-btn" data-subtab="graph">Dependency Graph</button>
@@ -305,7 +309,7 @@ tailwind.config = {
   </div>
 </div>
 
-<script src="graph-renderer.js?v=20260904"></script>
-<script src="app.js?v=20260905"></script>
+<script src="graph-renderer.js?v=20260906"></script>
+<script src="app.js?v=20260906"></script>
 </body>
 </html>

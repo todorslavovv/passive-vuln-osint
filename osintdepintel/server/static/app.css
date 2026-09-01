@@ -1380,3 +1380,84 @@ input.cyb-input::placeholder, textarea.cyb-input::placeholder { color: var(--tex
 #dashboard-targets-table tbody tr:last-child td { border-bottom: none; }
 #dashboard-targets-table tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
 #dashboard-targets-table td .btn { margin-left: 8px; }
+
+/* ==========================================================================
+   RESPONSIVE / MOBILE
+   Desktop keeps the fixed 260px sidebar. On phones/small tablets the sidebar
+   becomes an off-canvas drawer (hamburger + backdrop), the main column goes
+   full-width, and the fixed-height / side-by-side sections stack.
+   ========================================================================== */
+.sidebar-toggle { display: none; }
+#sidebar-backdrop { display: none; }
+
+@media (max-width: 768px) {
+    /* Off-canvas sidebar */
+    #app-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 60;
+    }
+    #app-sidebar.open {
+        transform: translateX(0);
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+    }
+
+    #sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.28s ease;
+        z-index: 55;
+    }
+    #sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    /* Main column reclaims the full width */
+    #app-main {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Hamburger button (hidden on desktop) */
+    .sidebar-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 6px;
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .sidebar-toggle:hover { border-color: var(--border-color-hover); color: var(--accent-cyan); }
+
+    /* Tighter header + content padding to give cards real estate */
+    header { padding-left: 16px !important; padding-right: 16px !important; }
+    #page-title { font-size: 18px !important; }
+    #app-main > .flex-1 { padding: 16px !important; }
+
+    /* Scanner: drop the fixed viewport height so the two cards stack */
+    #scanner-layout { height: auto !important; }
+    #scanner-layout > .cyb-card:last-child { min-height: 320px; }
+
+    /* Reports: stack the report list above the detail panel */
+    #reports-layout { flex-direction: column; height: auto !important; }
+    #reports-aside { width: 100% !important; max-height: 320px; }
+    #report-details-panel, #report-details-placeholder { min-height: 460px; }
+
+    /* Report sub-tabs scroll horizontally instead of squishing */
+    #report-subtabs { overflow-x: auto; }
+    #report-subtabs .sub-tab-btn { white-space: nowrap; flex-shrink: 0; }
+
+    /* Node drawer + modal fit the small screen */
+    .drawer { width: 100%; right: -100%; }
+    .modal { width: 94%; max-height: 88%; }
+
+    /* Keep the dependency graph usable */
+    .graph-viewport-container { min-height: 340px; }
+}
