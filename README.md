@@ -1,8 +1,11 @@
 # OSINT Dependency Vulnerability Intelligence
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-online-00f5ff?style=flat)](https://passive-vuln-osint-production.up.railway.app)
 [![CI](https://github.com/todorslavovv/passive-vuln-osint/actions/workflows/ci.yml/badge.svg)](https://github.com/todorslavovv/passive-vuln-osint/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+
+**▶ Live demo: [passive-vuln-osint-production.up.railway.app](https://passive-vuln-osint-production.up.railway.app)** — try it in the browser (each visitor gets a private sandbox).
 
 **Passive OSINT supply-chain dependency vulnerability intelligence CLI and dashboard.** Discovers software dependencies from public web artifacts (HTML, JS bundles, source maps, manifests), resolves versions with evidence chains, correlates known vulnerabilities (OSV, NVD), scores risk, and outputs JSON/text/DOT/SBOM reports. Zero third-party dependencies. 90% test coverage. Designed for offensive security recon and defensive posture assessment — no active scanning required.
 
