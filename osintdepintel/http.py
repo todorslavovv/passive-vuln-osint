@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -10,6 +11,30 @@ from typing import Any
 
 class HttpError(RuntimeError):
     pass
+
+
+# Error bodies are the only place APIs explain a 4xx (e.g. which request
+# parameter they rejected). Truncated so an HTML error page cannot flood logs.
+ERROR_BODY_LIMIT = 500
+_BEARER_RE = re.compile(r"(?i)\bbearer\s+\S+")
+
+
+def _error_body(exc: urllib.error.HTTPError) -> str:
+    """Return a short, single-line, credential-free excerpt of an error response body.
+
+    Must be called while the failed response is still open. Any bearer token the
+    server echoes back is redacted; the request's own Authorization header is
+    never part of this text.
+    """
+    try:
+        raw = exc.read(ERROR_BODY_LIMIT + 1)
+    except Exception:
+        return ""
+    text = " ".join(raw.decode("utf-8", errors="replace").split())
+    text = _BEARER_RE.sub("Bearer <redacted>", text)
+    if len(text) > ERROR_BODY_LIMIT:
+        text = text[:ERROR_BODY_LIMIT] + "...(truncated)"
+    return text
 
 
 class RateLimiter:
@@ -44,6 +69,7 @@ class HttpClient:
         retries = 3
         backoff = 1.0
         last_exc: Exception | None = None
+        last_body = ""
         for attempt in range(retries):
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
@@ -60,8 +86,11 @@ class HttpClient:
                     return b"".join(chunks)
             except Exception as exc:
                 last_exc = exc
+                last_body = ""
                 is_transient = False
                 if isinstance(exc, urllib.error.HTTPError):
+                    # Read the body now, while the failed response is still open.
+                    last_body = _error_body(exc)
                     if exc.code in (429, 502, 503, 504):
                         is_transient = True
                 elif isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionResetError)):
@@ -74,7 +103,8 @@ class HttpClient:
                 break
 
         if isinstance(last_exc, urllib.error.HTTPError):
-            raise HttpError(f"HTTP Error {last_exc.code}: {last_exc.reason}") from last_exc
+            detail = f" - {last_body}" if last_body else ""
+            raise HttpError(f"HTTP Error {last_exc.code}: {last_exc.reason}{detail}") from last_exc
         if last_exc:
             raise HttpError(str(last_exc)) from last_exc
         raise HttpError("Unknown HTTP client error")

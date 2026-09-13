@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import io
 import json
 import unittest
 import urllib.error
 from unittest.mock import MagicMock, patch
 
-from osintdepintel.http import HttpClient, HttpError, RateLimiter, join_url
+from osintdepintel.http import ERROR_BODY_LIMIT, HttpClient, HttpError, RateLimiter, join_url
 
 
 class HttpClientTests(unittest.TestCase):
@@ -163,6 +164,49 @@ class HttpClientTests(unittest.TestCase):
         with self.assertRaises(HttpError) as ctx:
             self.client.fetch("https://example.test/")
         self.assertIn("strange error", str(ctx.exception))
+
+    # --- Error response bodies ---
+
+    @staticmethod
+    def _http_error(code: int, reason: str, body: bytes) -> urllib.error.HTTPError:
+        return urllib.error.HTTPError("https://example.test/", code, reason, {}, io.BytesIO(body))
+
+    @patch("osintdepintel.http.urllib.request.urlopen")
+    def test_error_body_is_included(self, mock_urlopen: MagicMock) -> None:
+        body = json.dumps({"error": {"message": "unsupported parameter: top_p"}}).encode()
+        mock_urlopen.side_effect = self._http_error(400, "Bad Request", body)
+        with self.assertRaises(HttpError) as ctx:
+            self.client.post_json("https://example.test/api", {"input": "test"})
+        message = str(ctx.exception)
+        self.assertIn("HTTP Error 400: Bad Request", message)
+        self.assertIn("unsupported parameter: top_p", message)
+
+    @patch("osintdepintel.http.urllib.request.urlopen")
+    def test_error_body_is_truncated(self, mock_urlopen: MagicMock) -> None:
+        mock_urlopen.side_effect = self._http_error(500, "Server Error", b"x" * 5000)
+        with self.assertRaises(HttpError) as ctx:
+            self.client.fetch("https://example.test/")
+        message = str(ctx.exception)
+        self.assertIn("...(truncated)", message)
+        self.assertLess(len(message), ERROR_BODY_LIMIT + 100)
+
+    @patch("osintdepintel.http.urllib.request.urlopen")
+    def test_error_body_redacts_bearer_token(self, mock_urlopen: MagicMock) -> None:
+        mock_urlopen.side_effect = self._http_error(
+            401, "Unauthorized", b'{"detail":"bad header Bearer sk-secret-123"}'
+        )
+        with self.assertRaises(HttpError) as ctx:
+            self.client.fetch("https://example.test/")
+        message = str(ctx.exception)
+        self.assertNotIn("sk-secret-123", message)
+        self.assertIn("Bearer <redacted>", message)
+
+    @patch("osintdepintel.http.urllib.request.urlopen")
+    def test_unreadable_error_body_still_raises_status(self, mock_urlopen: MagicMock) -> None:
+        mock_urlopen.side_effect = urllib.error.HTTPError("https://example.test/", 403, "Forbidden", MagicMock(), None)
+        with self.assertRaises(HttpError) as ctx:
+            self.client.fetch("https://example.test/")
+        self.assertEqual(str(ctx.exception), "HTTP Error 403: Forbidden")
 
     # --- join_url ---
 
