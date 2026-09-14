@@ -1,7 +1,7 @@
-# Dashboard/server image for Railway (or any container host).
+# Dashboard/server image for Render (or any container host).
 # Runs the FastAPI dashboard from the source tree so the static assets and the
 # bundled example targets are present (the CLI Dockerfile builds a wheel, which
-# intentionally omits those). Binds to Railway's injected $PORT.
+# intentionally omits those). Binds to the host's injected $PORT.
 FROM python:3.12-slim-bookworm
 
 WORKDIR /app

@@ -1,11 +1,11 @@
 # OSINT Dependency Vulnerability Intelligence
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-online-00f5ff?style=flat)](https://passive-vuln-osint-production.up.railway.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-online-00f5ff?style=flat)](https://passive-vuln-osint.onrender.com)
 [![CI](https://github.com/todorslavovv/passive-vuln-osint/actions/workflows/ci.yml/badge.svg)](https://github.com/todorslavovv/passive-vuln-osint/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 
-**▶ Live demo: [passive-vuln-osint-production.up.railway.app](https://passive-vuln-osint-production.up.railway.app)** — try it in the browser (each visitor gets a private sandbox).
+**▶ Live demo: [passive-vuln-osint.onrender.com](https://passive-vuln-osint.onrender.com)** — try it in the browser (each visitor gets a private sandbox).
 
 **Passive OSINT supply-chain dependency vulnerability intelligence CLI and dashboard.** Discovers software dependencies from public web artifacts (HTML, JS bundles, source maps, manifests), resolves versions with evidence chains, correlates known vulnerabilities (OSV, NVD), scores risk, and outputs JSON/text/DOT/SBOM reports. Zero third-party dependencies. 90% test coverage. Designed for offensive security recon and defensive posture assessment — no active scanning required.
 
@@ -53,7 +53,7 @@ $env:OPENCODE_API_KEY="your-key"
 $env:OPENCODE_MODEL="nvidia/nemotron-3-ultra-550b-a55b"  # optional; this is the default
 ```
 
-When `OPENCODE_API_KEY` is set in the environment, the dashboard generates an AI summary for every scanned target automatically — no UI toggle or per-visitor setup needed (this is the Railway deployment path). It is also available on the CLI with `--opencode-summary`.
+When `OPENCODE_API_KEY` is set in the environment, the dashboard generates an AI summary for every scanned target automatically — no UI toggle or per-visitor setup needed (this is the hosted deployment path). It is also available on the CLI with `--opencode-summary`.
 
 `OPENCODE_MODEL` defaults to `nvidia/nemotron-3-ultra-550b-a55b` and `OPENCODE_BASE_URL` to NVIDIA NIM's endpoint. Any OpenAI-compatible provider works — set both.
 
@@ -78,25 +78,22 @@ It also writes:
 
 Re-scanning the same target overwrites the previous report files, so the report list stays clean.
 
-## Deploy the dashboard on Railway
+## Deploy the dashboard
 
-The repo ships a container image and Railway config for the web dashboard:
+The live demo runs on [Render](https://render.com). `Dockerfile.web` runs the FastAPI dashboard from source (so the static assets and bundled example targets are present) and binds to the host's injected `$PORT`, which works on Render, Fly, Railway or any container host.
 
-- `Dockerfile.railway` — runs the FastAPI dashboard from source (so the static assets and example targets are present) and binds to Railway's injected `$PORT`.
-- `railway.json` — points Railway at that Dockerfile.
+Steps (Render):
 
-Steps:
+1. Create a new **Web Service** from this GitHub repo, runtime **Docker**, and set the Dockerfile path to `Dockerfile.web`.
+2. In **Environment**, add `OPENCODE_API_KEY` (an NVIDIA NIM key — see [Per-target AI summaries](#per-target-ai-summaries)). Leave `OPENCODE_MODEL` and `OPENCODE_BASE_URL` unset to take the image defaults. With the key set, every scan gets an AI summary automatically.
+3. Deploy. The host assigns a public URL; the container serves the dashboard on `$PORT`.
 
-1. Create a new Railway project from this GitHub repo (Railway auto-detects `railway.json`).
-2. In the service **Variables**, add `OPENCODE_API_KEY` (an NVIDIA NIM key). Leave `OPENCODE_MODEL` and `OPENCODE_BASE_URL` unset to take the image defaults. With the key set, every scan gets an AI summary automatically.
-3. Deploy. Railway assigns a public URL; the container serves the dashboard on `$PORT`.
-
-The container reads its config from `OSINT_CONFIG_PATH` and writes reports to `OSINT_OUTPUT_DIR` (both preset in the image). Railway's filesystem is ephemeral — attach a volume at the output dir if you want reports to persist across restarts.
+The container reads its config from `OSINT_CONFIG_PATH` and writes reports to `OSINT_OUTPUT_DIR` (both preset in the image). Container filesystems are ephemeral — attach a disk at the output dir if you want reports to persist across restarts.
 
 To build/run the same image locally:
 
 ```bash
-docker build -f Dockerfile.railway -t osintdepintel-web .
+docker build -f Dockerfile.web -t osintdepintel-web .
 docker run --rm -p 8000:8000 -e OPENCODE_API_KEY="your-key" osintdepintel-web
 ```
 
