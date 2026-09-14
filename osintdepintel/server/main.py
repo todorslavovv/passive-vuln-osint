@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from ..ai_summary import OPENCODE_DEFAULT_MODEL, write_opencode_target_summary
+from ..ai_summary import AI_DEFAULT_MODEL, ai_env, write_opencode_target_summary
 from ..config import TargetConfig, load_targets
 from ..logger import logger
 from ..pipeline import Pipeline
@@ -115,9 +115,9 @@ def build_baseline() -> None:
                     result = Pipeline(offline=True, enable_nvd=False).process_targets(
                         seed, output_dir=BASELINE_REPORTS, include_graph=True
                     )
-                    key = os.environ.get("OPENCODE_API_KEY")
+                    key = ai_env("API_KEY")
                     if key:
-                        model = os.environ.get("OPENCODE_MODEL", OPENCODE_DEFAULT_MODEL)
+                        model = ai_env("MODEL", AI_DEFAULT_MODEL)
                         for report in result["reports"]:
                             write_opencode_target_summary(
                                 report, BASELINE_REPORTS, key, model, report["target"]["name"]
@@ -512,8 +512,8 @@ def run_scan_thread(
         offline = options.get("offline", False)
         skip_nvd = options.get("skip_nvd", False)
         # OpenCode AI summaries run when explicitly requested OR whenever an
-        # OPENCODE_API_KEY is configured in the environment (the deploy path — no UI toggle).
-        opencode_summary = options.get("opencode_summary", False) or bool(os.environ.get("OPENCODE_API_KEY"))
+        # AI_API_KEY is configured in the environment (the deploy path — no UI toggle).
+        opencode_summary = options.get("opencode_summary", False) or bool(ai_env("API_KEY"))
         rate_limit = options.get("rate_limit", 4.0)
         max_enrich_dependencies = options.get("max_enrich_dependencies")
 
@@ -530,13 +530,11 @@ def run_scan_thread(
         # A per-target OpenCode AI summary is written so each website report
         # has its own plain-language explanation.
         if opencode_summary:
-            opencode_api_key = options.get("opencode_api_key") or os.environ.get("OPENCODE_API_KEY")
+            opencode_api_key = options.get("opencode_api_key") or ai_env("API_KEY")
             if not opencode_api_key:
                 logger.warning("OpenCode summary requested but no API key was provided")
             else:
-                opencode_model = options.get("opencode_model") or os.environ.get(
-                    "OPENCODE_MODEL", OPENCODE_DEFAULT_MODEL
-                )
+                opencode_model = options.get("opencode_model") or ai_env("MODEL", AI_DEFAULT_MODEL)
                 for report in result["reports"]:
                     target_name = report["target"]["name"]
                     logger.info("Requesting OpenCode summary for '%s' using model '%s'...", target_name, opencode_model)

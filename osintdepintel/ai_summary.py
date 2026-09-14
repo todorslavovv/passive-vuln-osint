@@ -11,8 +11,7 @@ from .reporting.writers import _safe_filename
 
 # The AI summary talks to any OpenAI-compatible chat-completions endpoint. The
 # default is NVIDIA NIM, which -- unlike OpenCode Zen -- serves its models to a
-# plain API key. OPENCODE_* env names are kept for backwards compatibility with
-# existing deployments; they are provider-neutral in everything but the name.
+# plain API key.
 #
 # Do not go back to OpenCode Zen: its entire "-free" tier is gated to the
 # interactive OpenCode CLI and answers a server request with
@@ -20,8 +19,21 @@ from .reporting.writers import _safe_filename
 #   be used in OpenCode"}
 # (verified 2026-09-14 for every free id), while its paid ids need a billed
 # workspace and laguna-s-2.1-free was deleted outright.
-OPENCODE_DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-OPENCODE_DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+AI_DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+AI_DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+
+
+def ai_env(suffix: str, default: str = "") -> str:
+    """Read AI_<suffix>, falling back to the legacy OPENCODE_<suffix>.
+
+    The vars were named OPENCODE_* when the provider was OpenCode Zen. The client
+    is provider-neutral now and the old names actively mislead -- an NVIDIA key in
+    a variable called OPENCODE_API_KEY reads like a mistake. The fallback lets a
+    deployment rename its variables without a window where summaries break, and
+    can be dropped once every host has moved over.
+    """
+    return os.environ.get(f"AI_{suffix}") or os.environ.get(f"OPENCODE_{suffix}") or default
+
 
 _OPENCODE_SYSTEM = (
     "You explain passive OSINT dependency intelligence reports in simple human language. "
@@ -47,7 +59,7 @@ def _opencode_chat(prompt: str, api_key: str, model: str, timeout: int) -> str:
     runaway response can block a scan.
     """
     client = HttpClient(timeout=timeout)
-    base_url = os.environ.get("OPENCODE_BASE_URL", OPENCODE_DEFAULT_BASE_URL)
+    base_url = ai_env("BASE_URL", AI_DEFAULT_BASE_URL)
     response = client.post_json(
         base_url,
         {
@@ -71,7 +83,7 @@ def write_opencode_summary(
     aggregate_report: dict[str, Any],
     output_dir: Path,
     api_key: str,
-    model: str = OPENCODE_DEFAULT_MODEL,
+    model: str = AI_DEFAULT_MODEL,
     timeout: int = 120,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)

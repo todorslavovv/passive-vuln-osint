@@ -12,8 +12,8 @@ services:
       - OSINTDEPINTEL_LOG_LEVEL=${OSINTDEPINTEL_LOG_LEVEL:-INFO}
       - OSINTDEPINTEL_LOG_FILE=${OSINTDEPINTEL_LOG_FILE:-/app/reports/osintdepintel.log}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      - OPENCODE_API_KEY=${OPENCODE_API_KEY:-}
+      - AI_API_KEY=${AI_API_KEY:-}
       # Defaults to NVIDIA NIM; see ai_summary.py before changing provider.
-      - OPENCODE_MODEL=${OPENCODE_MODEL:-nvidia/nemotron-3-ultra-550b-a55b}
-      - OPENCODE_BASE_URL=${OPENCODE_BASE_URL:-https://integrate.api.nvidia.com/v1/chat/completions}
+      - AI_MODEL=${AI_MODEL:-nvidia/nemotron-3-ultra-550b-a55b}
+      - AI_BASE_URL=${AI_BASE_URL:-https://integrate.api.nvidia.com/v1/chat/completions}
     command: ["--config", "examples/targets.json", "--all", "--offline", "--output-dir", "reports"]

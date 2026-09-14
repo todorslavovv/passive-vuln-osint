@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import signal
 import sys
 from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .ai_summary import OPENCODE_DEFAULT_MODEL, write_opencode_summary
+from .ai_summary import AI_DEFAULT_MODEL, ai_env, write_opencode_summary
 from .config import AppConfig, load_targets, select_targets
 from .logger import configure_logging, logger
 from .pipeline import Pipeline
@@ -88,8 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--opencode-summary",
         action="store_true",
         help=(
-            "Generate a plain-language AI summary via OpenCode Zen. "
-            "Uses OPENCODE_API_KEY; model is OPENCODE_MODEL or the default."
+            "Generate a plain-language AI summary via OpenCode Zen. Uses AI_API_KEY; model is AI_MODEL or the default."
         ),
     )
     parser.add_argument("--log-file", help="Path to log file (default: stderr only).")
@@ -173,11 +171,11 @@ def main(argv: list[str] | None = None) -> int:
         logger.warning("Run completed after shutdown signal — results may be partial")
 
     if getattr(args, "opencode_summary", False):
-        api_key = os.environ.get("OPENCODE_API_KEY")
+        api_key = ai_env("API_KEY")
         if not api_key:
-            logger.warning("--opencode-summary requires OPENCODE_API_KEY in the environment — skipping")
+            logger.warning("--opencode-summary requires AI_API_KEY in the environment — skipping")
         else:
-            model = os.environ.get("OPENCODE_MODEL", OPENCODE_DEFAULT_MODEL)
+            model = ai_env("MODEL", AI_DEFAULT_MODEL)
             summary_path = write_opencode_summary(result["aggregate"], Path(app_config.output_dir), api_key, model)
             result["paths"]["opencode_summary"] = {"text": str(summary_path)}
             logger.info("OpenCode summary written to %s", summary_path)

@@ -22,14 +22,14 @@ RUN groupadd -r osint && useradd -r -g osint -d /app -s /sbin/nologin osint \
     && chown -R osint:osint /app
 USER osint
 
-# Config/output are env-overridable (see server/main.py). OPENCODE_API_KEY is set
-# in the host dashboard, not baked into the image; set it to an NVIDIA NIM key
-# (https://build.nvidia.com) to enable AI summaries. OPENCODE_BASE_URL points the
-# client at any other OpenAI-compatible provider. See ai_summary.py.
+# Config/output are env-overridable (see server/main.py). AI_API_KEY is set in the
+# host dashboard, not baked into the image; set it to an NVIDIA NIM key
+# (https://build.nvidia.com) to enable AI summaries. AI_BASE_URL points the client
+# at any other OpenAI-compatible provider. See ai_summary.py.
 ENV OSINT_CONFIG_PATH=/app/examples/targets.json \
     OSINT_OUTPUT_DIR=/app/reports \
-    OPENCODE_MODEL=nvidia/nemotron-3-ultra-550b-a55b \
-    OPENCODE_BASE_URL=https://integrate.api.nvidia.com/v1/chat/completions
+    AI_MODEL=nvidia/nemotron-3-ultra-550b-a55b \
+    AI_BASE_URL=https://integrate.api.nvidia.com/v1/chat/completions
 
 EXPOSE 8000
 CMD ["sh", "-c", "python -m osintdepintel --server --host 0.0.0.0 --port ${PORT:-8000} --config ${OSINT_CONFIG_PATH}"]

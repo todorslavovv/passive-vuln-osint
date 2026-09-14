@@ -42,20 +42,22 @@ Then open `http://localhost:8000` in a browser.
 
 The dashboard can generate a plain-language AI summary for each scanned website using **OpenCode Zen** (an OpenAI-compatible gateway).
 
-The provider is **NVIDIA NIM** by default (`nvidia/nemotron-3-ultra-550b-a55b`), which serves its models to a plain API key. Get one at [build.nvidia.com](https://build.nvidia.com). The client speaks plain OpenAI-compatible chat-completions, so `OPENCODE_BASE_URL` points it at any other provider.
+The provider is **NVIDIA NIM** by default (`nvidia/nemotron-3-ultra-550b-a55b`), which serves its models to a plain API key. Get one at [build.nvidia.com](https://build.nvidia.com). The client speaks plain OpenAI-compatible chat-completions, so `AI_BASE_URL` points it at any other provider.
 
-> **Avoid OpenCode Zen.** Its entire `-free` tier is walled off to the interactive OpenCode CLI and answers a plain API key with `HTTP 400 MissingSessionID: "OpenCode's free tier can only be used in OpenCode"`; its paid ids need a billed workspace, and the former default `laguna-s-2.1-free` was deleted from the gateway. The `OPENCODE_*` env names are historical — the client is provider-neutral.
+> **Avoid OpenCode Zen.** Its entire `-free` tier is walled off to the interactive OpenCode CLI and answers a plain API key with `HTTP 400 MissingSessionID: "OpenCode's free tier can only be used in OpenCode"`; its paid ids need a billed workspace, and the former default `laguna-s-2.1-free` was deleted from the gateway.
 
 The API key is set as an environment variable:
 
 ```powershell
-$env:OPENCODE_API_KEY="your-key"
-$env:OPENCODE_MODEL="nvidia/nemotron-3-ultra-550b-a55b"  # optional; this is the default
+$env:AI_API_KEY="your-key"
+$env:AI_MODEL="nvidia/nemotron-3-ultra-550b-a55b"  # optional; this is the default
 ```
 
-When `OPENCODE_API_KEY` is set in the environment, the dashboard generates an AI summary for every scanned target automatically — no UI toggle or per-visitor setup needed (this is the hosted deployment path). It is also available on the CLI with `--opencode-summary`.
+When `AI_API_KEY` is set in the environment, the dashboard generates an AI summary for every scanned target automatically — no UI toggle or per-visitor setup needed (this is the hosted deployment path). It is also available on the CLI with `--opencode-summary`.
 
-`OPENCODE_MODEL` defaults to `nvidia/nemotron-3-ultra-550b-a55b` and `OPENCODE_BASE_URL` to NVIDIA NIM's endpoint. Any OpenAI-compatible provider works — set both.
+`AI_MODEL` defaults to `nvidia/nemotron-3-ultra-550b-a55b` and `AI_BASE_URL` to NVIDIA NIM's endpoint. Any OpenAI-compatible provider works — set both.
+
+These were called `OPENCODE_*` when the provider was OpenCode Zen. The old names still work as a fallback, so an existing deployment keeps running, but they are misleading now and will be dropped — use `AI_*`.
 
 Nemotron is reasoning-capable and ships with thinking **on**; the client explicitly sends `chat_template_kwargs: {"enable_thinking": false}`. Leave thinking enabled and reasoning tokens consume `max_tokens`, returning a truncated answer that fails the readability check and silently falls back. If you swap in another reasoning model, check the same thing.
 
@@ -85,7 +87,7 @@ The live demo runs on [Render](https://render.com). `Dockerfile.web` runs the Fa
 Steps (Render):
 
 1. Create a new **Web Service** from this GitHub repo, runtime **Docker**, and set the Dockerfile path to `Dockerfile.web`.
-2. In **Environment**, add `OPENCODE_API_KEY` (an NVIDIA NIM key — see [Per-target AI summaries](#per-target-ai-summaries)). Leave `OPENCODE_MODEL` and `OPENCODE_BASE_URL` unset to take the image defaults. With the key set, every scan gets an AI summary automatically.
+2. In **Environment**, add `AI_API_KEY` (an NVIDIA NIM key — see [Per-target AI summaries](#per-target-ai-summaries)). Leave `AI_MODEL` and `AI_BASE_URL` unset to take the image defaults. With the key set, every scan gets an AI summary automatically.
 3. Deploy. The host assigns a public URL; the container serves the dashboard on `$PORT`.
 
 The container reads its config from `OSINT_CONFIG_PATH` and writes reports to `OSINT_OUTPUT_DIR` (both preset in the image). Container filesystems are ephemeral — attach a disk at the output dir if you want reports to persist across restarts.
@@ -94,7 +96,7 @@ To build/run the same image locally:
 
 ```bash
 docker build -f Dockerfile.web -t osintdepintel-web .
-docker run --rm -p 8000:8000 -e OPENCODE_API_KEY="your-key" osintdepintel-web
+docker run --rm -p 8000:8000 -e AI_API_KEY="your-key" osintdepintel-web
 ```
 
 ## CLI Usage

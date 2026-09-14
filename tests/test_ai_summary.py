@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from osintdepintel.ai_summary import (
-    OPENCODE_DEFAULT_BASE_URL,
-    OPENCODE_DEFAULT_MODEL,
+    AI_DEFAULT_BASE_URL,
+    AI_DEFAULT_MODEL,
     _clean_text,
     _local_fallback_summary,
     _looks_readable,
     _summary_prompt,
+    ai_env,
     write_opencode_summary,
     write_opencode_target_summary,
 )
@@ -180,14 +182,14 @@ class OpenCodeSummaryTests:
             write_opencode_summary(SAMPLE_AGGREGATE, Path(tmp), "secret-key-999")
             _, kwargs = mock_http.post_json.call_args
             assert kwargs["headers"]["Authorization"] == "Bearer secret-key-999"
-            # model defaults to OPENCODE_DEFAULT_MODEL when not overridden
+            # model defaults to AI_DEFAULT_MODEL when not overridden
             payload = mock_http.post_json.call_args.args[1]
-            assert payload["model"] == OPENCODE_DEFAULT_MODEL
+            assert payload["model"] == AI_DEFAULT_MODEL
             # Nemotron ships with thinking ON; left on it eats max_tokens and
             # returns a truncated answer that _looks_readable then rejects.
             assert payload["chat_template_kwargs"] == {"enable_thinking": False}
             assert payload["stream"] is False
-            assert mock_http.post_json.call_args.args[0] == OPENCODE_DEFAULT_BASE_URL
+            assert mock_http.post_json.call_args.args[0] == AI_DEFAULT_BASE_URL
 
     def test_http_error_triggers_fallback(self) -> None:
         mock_http = MagicMock()
@@ -217,3 +219,20 @@ class OpenCodeSummaryTests:
             )
             assert path.name == "example_site_opencode_summary.txt"
             assert path.exists()
+
+
+class AiEnvTests:
+    """AI_* wins, OPENCODE_* still works, default applies when neither is set."""
+
+    def test_prefers_new_name(self) -> None:
+        with patch.dict(os.environ, {"AI_MODEL": "new", "OPENCODE_MODEL": "old"}, clear=True):
+            assert ai_env("MODEL", "fallback") == "new"
+
+    def test_falls_back_to_legacy_name(self) -> None:
+        with patch.dict(os.environ, {"OPENCODE_MODEL": "old"}, clear=True):
+            assert ai_env("MODEL", "fallback") == "old"
+
+    def test_default_when_unset(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            assert ai_env("MODEL", "fallback") == "fallback"
+            assert ai_env("API_KEY") == ""
