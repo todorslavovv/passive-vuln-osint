@@ -13,6 +13,7 @@ services:
       - OSINTDEPINTEL_LOG_FILE=${OSINTDEPINTEL_LOG_FILE:-/app/reports/osintdepintel.log}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - OPENCODE_API_KEY=${OPENCODE_API_KEY:-}
-      # A "-free" id only works inside the OpenCode CLI; see ai_summary.py.
-      - OPENCODE_MODEL=${OPENCODE_MODEL:-nemotron-3.5-lightning-free}
+      # Defaults to NVIDIA NIM; see ai_summary.py before changing provider.
+      - OPENCODE_MODEL=${OPENCODE_MODEL:-nvidia/nemotron-3-ultra-550b-a55b}
+      - OPENCODE_BASE_URL=${OPENCODE_BASE_URL:-https://integrate.api.nvidia.com/v1/chat/completions}
     command: ["--config", "examples/targets.json", "--all", "--offline", "--output-dir", "reports"]

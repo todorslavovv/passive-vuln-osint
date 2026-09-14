@@ -42,18 +42,22 @@ Then open `http://localhost:8000` in a browser.
 
 The dashboard can generate a plain-language AI summary for each scanned website using **OpenCode Zen** (an OpenAI-compatible gateway).
 
-> **This needs a paid model id.** OpenCode Zen restricts its entire `-free` tier to the interactive OpenCode CLI, which sends a session id a plain API key cannot supply. Any free id — including the shipped default — answers a server request with `HTTP 400 MissingSessionID: "OpenCode's free tier can only be used in OpenCode"`, and the scanner writes its deterministic local summary instead. To get real AI summaries, set `OPENCODE_MODEL` to a paid id such as `claude-haiku-4-5` on a workspace that has a payment method.
+The provider is **NVIDIA NIM** by default (`nvidia/nemotron-3-ultra-550b-a55b`), which serves its models to a plain API key. Get one at [build.nvidia.com](https://build.nvidia.com). The client speaks plain OpenAI-compatible chat-completions, so `OPENCODE_BASE_URL` points it at any other provider.
+
+> **Avoid OpenCode Zen.** Its entire `-free` tier is walled off to the interactive OpenCode CLI and answers a plain API key with `HTTP 400 MissingSessionID: "OpenCode's free tier can only be used in OpenCode"`; its paid ids need a billed workspace, and the former default `laguna-s-2.1-free` was deleted from the gateway. The `OPENCODE_*` env names are historical — the client is provider-neutral.
 
 The API key is set as an environment variable:
 
 ```powershell
 $env:OPENCODE_API_KEY="your-key"
-$env:OPENCODE_MODEL="claude-haiku-4-5"   # optional; a paid id, needed for a real summary
+$env:OPENCODE_MODEL="nvidia/nemotron-3-ultra-550b-a55b"  # optional; this is the default
 ```
 
 When `OPENCODE_API_KEY` is set in the environment, the dashboard generates an AI summary for every scanned target automatically — no UI toggle or per-visitor setup needed (this is the Railway deployment path). It is also available on the CLI with `--opencode-summary`.
 
-`OPENCODE_MODEL` defaults to `nemotron-3.5-lightning-free`, so the project never spends money unless you opt in; any id from `https://opencode.ai/zen/v1/models` is accepted. Two ids to avoid: `laguna-s-2.1-free` (a former default, since removed from the gateway — it 401s with a misleading `Model ... is not supported`) and `ling-3.0-flash-fin-free` (a finance-tuned free model that 400s like every other free id).
+`OPENCODE_MODEL` defaults to `nvidia/nemotron-3-ultra-550b-a55b` and `OPENCODE_BASE_URL` to NVIDIA NIM's endpoint. Any OpenAI-compatible provider works — set both.
+
+Nemotron is reasoning-capable and ships with thinking **on**; the client explicitly sends `chat_template_kwargs: {"enable_thinking": false}`. Leave thinking enabled and reasoning tokens consume `max_tokens`, returning a truncated answer that fails the readability check and silently falls back. If you swap in another reasoning model, check the same thing.
 
 If no key is provided, the scanner writes a deterministic local-fallback explanation to the per-target summary file so the report remains complete. The same fallback is used if the model is temporarily unavailable, so a scan never fails because of an AI error.
 
@@ -84,7 +88,7 @@ The repo ships a container image and Railway config for the web dashboard:
 Steps:
 
 1. Create a new Railway project from this GitHub repo (Railway auto-detects `railway.json`).
-2. In the service **Variables**, add `OPENCODE_API_KEY`. With the key set, every scan gets an AI summary automatically — but leave `OPENCODE_MODEL` unset unless you are pointing it at a paid id, since free ids fall back to the local summary (see [Per-target AI summaries](#per-target-ai-summaries)).
+2. In the service **Variables**, add `OPENCODE_API_KEY` (an NVIDIA NIM key). Leave `OPENCODE_MODEL` and `OPENCODE_BASE_URL` unset to take the image defaults. With the key set, every scan gets an AI summary automatically.
 3. Deploy. Railway assigns a public URL; the container serves the dashboard on `$PORT`.
 
 The container reads its config from `OSINT_CONFIG_PATH` and writes reports to `OSINT_OUTPUT_DIR` (both preset in the image). Railway's filesystem is ephemeral — attach a volume at the output dir if you want reports to persist across restarts.

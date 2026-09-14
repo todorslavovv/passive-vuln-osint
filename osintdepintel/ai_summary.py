@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -8,25 +9,19 @@ from typing import Any
 from .http import HttpClient, HttpError
 from .reporting.writers import _safe_filename
 
-# OpenCode Zen is an OpenAI-compatible chat-completions gateway (Bearer auth).
-OPENCODE_BASE_URL = "https://opencode.ai/zen/v1/chat/completions"
-# Heads-up before you change this: OpenCode Zen gates its whole "-free" tier to the
-# interactive OpenCode CLI, which sends a session id a plain API key cannot supply.
-# Every free id therefore answers a server request with
-#   HTTP 400 {"type":"MissingSessionID","message":"OpenCode's free tier can only be
-#   used in OpenCode"}
-# and the dashboard falls back to the deterministic local summary. Verified on
-# 2026-09-14 for ling-3.0-flash-fin-free (a finance-tuned model that looks tempting
-# but 400s like the rest), mimo-v2.5-free and both muse-spark contributor tiers.
-# laguna-s-2.1-free, the previous default, was removed from the gateway entirely and
-# now answers HTTP 401 "Model laguna-s-2.1-free is not supported" — a misleading
-# error that reads like a bad key, which is why it is no longer the default.
-# The default below is kept on a free id deliberately (no spend by default); it still
-# exists on the gateway, so the fallback text states the real free-tier reason.
-# For a working AI summary, point OPENCODE_MODEL at a paid id (e.g. claude-haiku-4-5)
-# on a workspace with a payment method — paid ids answer 401 "No payment method"
-# until billing is set up.
-OPENCODE_DEFAULT_MODEL = "nemotron-3.5-lightning-free"
+# The AI summary talks to any OpenAI-compatible chat-completions endpoint. The
+# default is NVIDIA NIM, which -- unlike OpenCode Zen -- serves its models to a
+# plain API key. OPENCODE_* env names are kept for backwards compatibility with
+# existing deployments; they are provider-neutral in everything but the name.
+#
+# Do not go back to OpenCode Zen: its entire "-free" tier is gated to the
+# interactive OpenCode CLI and answers a server request with
+#   HTTP 400 {"type":"MissingSessionID","message":"OpenCode's free tier can only
+#   be used in OpenCode"}
+# (verified 2026-09-14 for every free id), while its paid ids need a billed
+# workspace and laguna-s-2.1-free was deleted outright.
+OPENCODE_DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+OPENCODE_DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 
 _OPENCODE_SYSTEM = (
     "You explain passive OSINT dependency intelligence reports in simple human language. "
@@ -35,15 +30,26 @@ _OPENCODE_SYSTEM = (
 
 
 def _opencode_chat(prompt: str, api_key: str, model: str, timeout: int) -> str:
-    """Call the OpenCode Zen OpenAI-compatible endpoint and return the message text.
+    """Call an OpenAI-compatible chat-completions endpoint and return the message text.
 
-    max_tokens is kept modest to limit output-token spend; no reasoning/thinking
-    parameters are sent so the model answers directly (cheaper, and plenty for a
-    plain-language summary).
+    Two payload keys matter for the default NVIDIA Nemotron model and are harmless
+    elsewhere:
+
+    * ``stream`` is false because HttpClient reads whole responses, not SSE deltas.
+    * ``enable_thinking`` is false because Nemotron is reasoning-capable and ships
+      with thinking ON. Left on, reasoning tokens are billed against max_tokens and
+      the answer comes back truncated into ``reasoning_content``, leaving ``content``
+      short enough that _looks_readable rejects it -- an AI failure that looks
+      exactly like a working fallback.
+
+    max_tokens is deliberately small: a plain-language summary of one report measured
+    ~115 output tokens, so 600 is headroom, not a budget, and it caps how long a
+    runaway response can block a scan.
     """
     client = HttpClient(timeout=timeout)
+    base_url = os.environ.get("OPENCODE_BASE_URL", OPENCODE_DEFAULT_BASE_URL)
     response = client.post_json(
-        OPENCODE_BASE_URL,
+        base_url,
         {
             "model": model,
             "messages": [
@@ -52,7 +58,9 @@ def _opencode_chat(prompt: str, api_key: str, model: str, timeout: int) -> str:
             ],
             "temperature": 0.2,
             "top_p": 0.95,
-            "max_tokens": 2048,
+            "max_tokens": 600,
+            "stream": False,
+            "chat_template_kwargs": {"enable_thinking": False},
         },
         headers={"Authorization": f"Bearer {api_key}"},
     )

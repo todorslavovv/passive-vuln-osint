@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from osintdepintel.ai_summary import (
+    OPENCODE_DEFAULT_BASE_URL,
     OPENCODE_DEFAULT_MODEL,
     _clean_text,
     _local_fallback_summary,
@@ -182,6 +183,11 @@ class OpenCodeSummaryTests:
             # model defaults to OPENCODE_DEFAULT_MODEL when not overridden
             payload = mock_http.post_json.call_args.args[1]
             assert payload["model"] == OPENCODE_DEFAULT_MODEL
+            # Nemotron ships with thinking ON; left on it eats max_tokens and
+            # returns a truncated answer that _looks_readable then rejects.
+            assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+            assert payload["stream"] is False
+            assert mock_http.post_json.call_args.args[0] == OPENCODE_DEFAULT_BASE_URL
 
     def test_http_error_triggers_fallback(self) -> None:
         mock_http = MagicMock()
@@ -207,7 +213,7 @@ class OpenCodeSummaryTests:
             patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
         ):
             path = write_opencode_target_summary(
-                target_report, Path(tmp), "k", "nemotron-3.5-lightning-free", "Example Site"
+                target_report, Path(tmp), "k", "nvidia/nemotron-3-ultra-550b-a55b", "Example Site"
             )
             assert path.name == "example_site_opencode_summary.txt"
             assert path.exists()

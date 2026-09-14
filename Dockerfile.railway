@@ -23,13 +23,13 @@ RUN groupadd -r osint && useradd -r -g osint -d /app -s /sbin/nologin osint \
 USER osint
 
 # Config/output are env-overridable (see server/main.py). OPENCODE_API_KEY is set
-# in the host dashboard, not baked into the image. Note that OpenCode Zen's "-free"
-# tier is usable only from the interactive OpenCode CLI, so with the default model
-# below every summary falls back to the deterministic local one; set OPENCODE_MODEL
-# to a paid id on a billed workspace to get real AI summaries. See ai_summary.py.
+# in the host dashboard, not baked into the image; set it to an NVIDIA NIM key
+# (https://build.nvidia.com) to enable AI summaries. OPENCODE_BASE_URL points the
+# client at any other OpenAI-compatible provider. See ai_summary.py.
 ENV OSINT_CONFIG_PATH=/app/examples/targets.json \
     OSINT_OUTPUT_DIR=/app/reports \
-    OPENCODE_MODEL=nemotron-3.5-lightning-free
+    OPENCODE_MODEL=nvidia/nemotron-3-ultra-550b-a55b \
+    OPENCODE_BASE_URL=https://integrate.api.nvidia.com/v1/chat/completions
 
 EXPOSE 8000
 CMD ["sh", "-c", "python -m osintdepintel --server --host 0.0.0.0 --port ${PORT:-8000} --config ${OSINT_CONFIG_PATH}"]
