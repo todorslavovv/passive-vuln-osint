@@ -200,8 +200,45 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     // DATA SYNC & LOADING
     // ==========================================================================
-    async function syncData() {
+    // The free hosting tier sleeps when idle, so the very first request can take
+    // ~30s. Keep the overlay up until it answers, and only explain the delay once
+    // it is long enough to be noticeable -- a warm load should not flash a wall of
+    // text at the user.
+    const bootOverlay = document.getElementById('boot-overlay');
+    const BOOT_SLOW_AFTER_MS = 2500;
+    let bootSlowTimer = null;
+
+    // Server errors can be an HTML page rather than JSON; show a readable line
+    // instead of dumping markup into the overlay.
+    function tidyBootError(message) {
+        const text = String(message || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!text) return 'Could not reach the server.';
+        return text.length > 120 ? `${text.slice(0, 120)}\u2026` : text;
+    }
+
+    function finishBoot(failed, message) {
+        if (!bootOverlay) return;
+        clearTimeout(bootSlowTimer);
+        if (failed) {
+            bootOverlay.classList.add('failed');
+            const title = bootOverlay.querySelector('.boot-title');
+            if (title) title.textContent = 'Cannot reach scanner';
+            const msg = bootOverlay.querySelector('.boot-error-msg');
+            if (msg) msg.textContent = tidyBootError(message);
+            return;
+        }
+        const title = bootOverlay.querySelector('.boot-title');
+        if (title) title.textContent = 'Connecting to scanner';
+        bootOverlay.classList.add('hidden');
+        setTimeout(() => bootOverlay.remove(), 400);
+    }
+
+    async function syncData(isBoot = false) {
         showLoadingState();
+        if (isBoot && bootOverlay) {
+            bootOverlay.classList.remove('failed');
+            bootSlowTimer = setTimeout(() => bootOverlay.classList.add('slow'), BOOT_SLOW_AFTER_MS);
+        }
         try {
             await Promise.all([
                 fetchTargets(),
@@ -209,12 +246,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 checkScanStatus()
             ]);
             updateDashboardMetrics();
+            if (isBoot) finishBoot(false);
         } catch (err) {
             console.error('Error syncing dashboard data:', err);
             addConsoleLine(`System Sync error: ${err.message}`, 'error');
+            if (isBoot) finishBoot(true, `Could not reach the server: ${err.message}`);
         } finally {
             hideLoadingState();
         }
+    }
+
+    if (bootOverlay) {
+        const retry = document.getElementById('boot-retry');
+        if (retry) retry.addEventListener('click', () => {
+            bootOverlay.classList.remove('failed', 'slow');
+            syncData(true);
+        });
     }
 
     function showLoadingState() {
@@ -1097,5 +1144,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initialize Page load
-    syncData();
+    syncData(true);
 });

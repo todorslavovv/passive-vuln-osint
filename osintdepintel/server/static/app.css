@@ -1461,3 +1461,76 @@ input.cyb-input::placeholder, textarea.cyb-input::placeholder { color: var(--tex
     /* Keep the dependency graph usable */
     .graph-viewport-container { min-height: 340px; }
 }
+
+
+/* ==========================================================================
+   BOOT OVERLAY
+   Free-tier hosts sleep when idle; the first request can take ~30s. Covering
+   the empty shell with an explanation stops that reading as a dead site.
+   ========================================================================== */
+#boot-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg-main);
+    transition: opacity 0.35s ease;
+}
+
+#boot-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#boot-overlay .boot-box {
+    max-width: 440px;
+    text-align: center;
+}
+
+#boot-overlay .boot-spinner {
+    width: 42px;
+    height: 42px;
+    margin: 0 auto 20px;
+    border: 2px solid rgba(0, 245, 255, 0.15);
+    border-top-color: var(--accent-cyan);
+    border-radius: 50%;
+    animation: boot-spin 0.9s linear infinite;
+    box-shadow: var(--shadow-glow-cyan);
+}
+
+@keyframes boot-spin { to { transform: rotate(360deg); } }
+
+#boot-overlay .boot-title {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-cyan);
+}
+
+/* Only shown once the wait is long enough to need explaining. */
+#boot-overlay .boot-slow,
+#boot-overlay .boot-error {
+    display: none;
+    margin-top: 14px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+#boot-overlay.slow .boot-slow { display: block; }
+
+#boot-overlay.failed .boot-spinner { animation: none; border-top-color: var(--color-critical); }
+#boot-overlay.failed .boot-title { color: var(--color-critical); }
+#boot-overlay.failed .boot-slow { display: none; }
+#boot-overlay.failed .boot-error { display: block; }
+
+#boot-overlay .boot-error-msg { margin-bottom: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+    #boot-overlay .boot-spinner { animation: none; }
+    #boot-overlay { transition: none; }
+}

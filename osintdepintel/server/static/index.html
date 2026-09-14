@@ -36,6 +36,24 @@ tailwind.config = {
 </head>
 <body class="font-sans antialiased flex h-screen w-screen overflow-hidden bg-background text-on-surface">
 
+<!-- Boot overlay: the free hosting tier sleeps when idle, so the first request
+     after a cold start can take ~30s. Without this the page is simply blank and
+     reads as broken. -->
+<div id="boot-overlay">
+  <div class="boot-box">
+    <div class="boot-spinner" aria-hidden="true"></div>
+    <div class="boot-title">Connecting to scanner</div>
+    <div class="boot-slow">
+      The demo runs on a free host that sleeps when idle, so the first load after a
+      while takes up to a minute while it wakes up. Nothing is broken &mdash; hang tight.
+    </div>
+    <div class="boot-error">
+      <div class="boot-error-msg">Could not reach the server.</div>
+      <button class="btn btn-primary" id="boot-retry" type="button">Retry</button>
+    </div>
+  </div>
+</div>
+
 <!-- SIDEBAR -->
 <div id="sidebar-backdrop"></div>
 <nav id="app-sidebar" class="fixed left-0 top-0 h-full w-[260px] flex flex-col bg-surface-alt border-r border-border-subtle z-50">
