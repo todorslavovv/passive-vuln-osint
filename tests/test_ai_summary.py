@@ -206,6 +206,8 @@ class OpenCodeSummaryTests:
             tempfile.TemporaryDirectory() as tmp,
             patch("osintdepintel.ai_summary.HttpClient", return_value=mock_http),
         ):
-            path = write_opencode_target_summary(target_report, Path(tmp), "k", "laguna-s-2.1-free", "Example Site")
+            path = write_opencode_target_summary(
+                target_report, Path(tmp), "k", "nemotron-3.5-lightning-free", "Example Site"
+            )
             assert path.name == "example_site_opencode_summary.txt"
             assert path.exists()

@@ -10,10 +10,23 @@ from .reporting.writers import _safe_filename
 
 # OpenCode Zen is an OpenAI-compatible chat-completions gateway (Bearer auth).
 OPENCODE_BASE_URL = "https://opencode.ai/zen/v1/chat/completions"
-# laguna-s-2.1-free is fast, non-reasoning, and returns clean content reliably via
-# API key. (muse-spark-1.2-contributor-free 500s for raw API keys — it needs the
-# interactive OpenCode CLI contributor opt-in, not available to a server.)
-OPENCODE_DEFAULT_MODEL = "laguna-s-2.1-free"
+# Heads-up before you change this: OpenCode Zen gates its whole "-free" tier to the
+# interactive OpenCode CLI, which sends a session id a plain API key cannot supply.
+# Every free id therefore answers a server request with
+#   HTTP 400 {"type":"MissingSessionID","message":"OpenCode's free tier can only be
+#   used in OpenCode"}
+# and the dashboard falls back to the deterministic local summary. Verified on
+# 2026-09-14 for ling-3.0-flash-fin-free (a finance-tuned model that looks tempting
+# but 400s like the rest), mimo-v2.5-free and both muse-spark contributor tiers.
+# laguna-s-2.1-free, the previous default, was removed from the gateway entirely and
+# now answers HTTP 401 "Model laguna-s-2.1-free is not supported" — a misleading
+# error that reads like a bad key, which is why it is no longer the default.
+# The default below is kept on a free id deliberately (no spend by default); it still
+# exists on the gateway, so the fallback text states the real free-tier reason.
+# For a working AI summary, point OPENCODE_MODEL at a paid id (e.g. claude-haiku-4-5)
+# on a workspace with a payment method — paid ids answer 401 "No payment method"
+# until billing is set up.
+OPENCODE_DEFAULT_MODEL = "nemotron-3.5-lightning-free"
 
 _OPENCODE_SYSTEM = (
     "You explain passive OSINT dependency intelligence reports in simple human language. "
